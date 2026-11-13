@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mis trabajos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f4f5f6;
+      color: #18181b;
+    }
+
+    .mono-label {
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.05em;
+    }
+
+    .drag-over-top {
+      box-shadow: inset 0 3px 0 0 #0f6259 !important;
+      background-color: #f0fdf9 !important;
+    }
+    .drag-over-bottom {
+      box-shadow: inset 0 -3px 0 0 #0f6259 !important;
+      background-color: #f0fdf9 !important;
+    }
+    .dragging-row {
+      opacity: 0.45;
+      background-color: #e4e4e7 !important;
+    }
+
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #d4d4d8;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a1a1aa;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-16">
+
+  <div class="max-w-[1220px] mx-auto px-4 sm:px-6 pt-7">
+
+    <!-- Top Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div>
+        <div id="currentDateLabel" class="mono-label text-xs uppercase text-zinc-500 mb-1">
+          VIERNES, 13 DE NOVIEMBRE
+        </div>
+        <h1 class="text-[28px] font-bold tracking-tight text-zinc-900 leading-tight">
+          Mis trabajos
+        </h1>
+        <div class="flex items-center gap-3 mt-1.5">
+          <span id="progressText" class="text-xs text-zinc-500 font-medium">0/0 completadas</span>
+          <div class="w-40 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+            <div id="progressBar" class="h-full bg-[#0f6259] rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2.5">
+        <button onclick="openExcelModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 text-sm font-medium rounded-lg border border-zinc-200 shadow-xs transition cursor-pointer">
+          <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          Importar / Exportar Excel
+        </button>
+
+        <button onclick="openTaskModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0f6259] hover:bg-[#0b4f48] text-white text-sm font-medium rounded-lg shadow-xs transition cursor-pointer">
+          <span class="text-base leading-none">+</span>
+          Nueva tarea
+          <kbd class="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-white/15 rounded text-white/90">N</kbd>
+        </button>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 bg-white rounded-xl border border-zinc-200/90 shadow-2xs mb-6 divide-y lg:divide-y-0 lg:divide-x divide-zinc-200/80 overflow-hidden">
+      <div onclick="setStatusFilter('Abiertas')" class="p-4 sm:px-5 sm:py-4 hover:bg-zinc-50/70 transition cursor-pointer">
+        <div id="kpiAbiertas" class="text-[26px] font-semibold text-zinc-900 leading-none mb-1.5">0</div>
+        <div class="text-xs text-zinc-500">Abiertas</div>
+      </div>
+
+      <div onclick="filterByHighPriority()" class="p-4 sm:px-5 sm:py-4 hover:bg-zinc-50/70 transition cursor-pointer">
+        <div id="kpiAlta" class="text-[26px] font-semibold text-zinc-900 leading-none mb-1.5">0</div>
+        <div class="text-xs text-zinc-500">Prioridad alta</div>
+      </div>
+
+      <div onclick="filterByOverdue()" class="p-4 sm:px-5 sm:py-4 hover:bg-zinc-50/70 transition cursor-pointer">
+        <div id="kpiVencidas" class="text-[26px] font-semibold text-red-700 leading-none mb-1.5">0</div>
+        <div class="text-xs text-zinc-500">Vencidas</div>
+      </div>
+
+      <div onclick="filterByDelegated()" class="p-4 sm:px-5 sm:py-4 hover:bg-zinc-50/70 transition cursor-pointer">
+        <div id="kpiDerivar" class="text-[26px] font-semibold text-zinc-900 leading-none mb-1.5">0</div>
+        <div class="text-xs text-zinc-500">Por derivar</div>
+      </div>
+    </div>
+
+    <!-- Filter Bar Row 1 -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
+      <div id="statusPills" class="flex flex-wrap items-center gap-1.5"></div>
+
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="relative flex-1 sm:flex-initial">
+          <input
+            id="searchInput"
+            type="text"
+            oninput="render()"
+            placeholder="Buscar tarea, ubicación o nota..."
+            class="w-full sm:w-64 pl-3 pr-8 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-[#0f6259]"
+          />
+          <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 text-xs cursor-pointer">✕</button>
+        </div>
+
+        <select id="priorityFilter" onchange="render()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 focus:outline-none focus:border-[#0f6259] cursor-pointer">
+          <option value="ALL">Toda prioridad</option>
+          <option value="Alta">Prioridad Alta</option>
+          <option value="Media">Prioridad Media</option>
+          <option value="Baja">Prioridad Baja</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Filter Bar Row 2 -->
+    <div class="flex flex-wrap items-center justify-between gap-2.5 mb-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <select id="assigneeFilter" onchange="render()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 focus:outline-none focus:border-[#0f6259] cursor-pointer">
+          <option value="ALL">Todos los responsables</option>
+        </select>
+
+        <select id="sortModeSelect" onchange="handleSortModeChange()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 focus:outline-none focus:border-[#0f6259] cursor-pointer">
+          <option value="manual">Orden: manual (arrastrar)</option>
+          <option value="group_priority">Agrupar por prioridad (Alta › Media › Baja)</option>
+          <option value="deadline_asc">Orden: fecha límite más próxima</option>
+        </select>
+
+        <button id="onlyDelegatedBtn" onclick="toggleOnlyDelegated()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition cursor-pointer">
+          Solo por derivar
+        </button>
+
+        <button id="onlyOverdueBtn" onclick="toggleOnlyOverdue()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition cursor-pointer">
+          Solo vencidas
+        </button>
+
+        <button id="resetFiltersBtn" onclick="resetFilters()" class="hidden px-2.5 py-1.5 text-xs font-medium text-[#0f6259] hover:underline cursor-pointer">
+          Limpiar filtros
+        </button>
+      </div>
+
+      <div id="dragHint" class="text-xs text-zinc-400 hidden sm:flex items-center gap-1.5">
+        <span>Arrastra <strong class="text-zinc-600">≡</strong> para reordenar prioridades individualmente</span>
+      </div>
+    </div>
+
+    <!-- Quick Inline Add Bar (Excel Row Style) -->
+    <form onsubmit="handleQuickAdd(event)" class="bg-white rounded-xl border border-zinc-200/90 shadow-2xs p-2.5 mb-3">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
+        <div class="md:col-span-4">
+          <input
+            id="qaTitle"
+            type="text"
+            required
+            placeholder="+ Añadir tarea rápida... (ej. Revisar caldera edificio B)"
+            class="w-full px-3 py-1.5 text-sm bg-zinc-50/70 focus:bg-white border border-zinc-200 rounded-lg text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-[#0f6259]"
+          />
+        </div>
+        <div class="md:col-span-2">
+          <input
+            id="qaLocation"
+            type="text"
+            placeholder="Ubicación / nota"
+            class="w-full px-2.5 py-1.5 text-sm bg-zinc-50/70 focus:bg-white border border-zinc-200 rounded-lg text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:border-[#0f6259]"
+          />
+        </div>
+        <div class="md:col-span-1">
+          <select id="qaPriority" title="Prioridad" class="w-full px-2 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg text-zinc-700 focus:outline-none focus:border-[#0f6259] cursor-pointer">
+            <option value="Alta">Alta</option>
+            <option value="Media" selected>Media</option>
+            <option value="Baja">Baja</option>
+          </select>
+        </div>
+        <div class="md:col-span-2">
+          <input
+            id="qaAssignee"
+            type="text"
+            list="assigneesDatalist"
+            value="Yo"
+            placeholder="Responsable"
+            class="w-full px-2.5 py-1.5 text-sm bg-zinc-50/70 focus:bg-white border border-zinc-200 rounded-lg text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:border-[#0f6259]"
+          />
+        </div>
+        <div class="md:col-span-2 flex items-center gap-2">
+          <input
+            id="qaDeadline"
+            type="date"
+            title="Fecha límite"
+            class="w-full px-2 py-1.5 text-xs bg-zinc-50/70 focus:bg-white border border-zinc-200 rounded-lg text-zinc-700 focus:outline-none focus:border-[#0f6259]"
+          />
+          <label class="inline-flex items-center gap-1 text-xs text-zinc-600 shrink-0 cursor-pointer select-none" title="Marcar para derivar">
+            <input id="qaDerivar" type="checkbox" class="w-4 h-4 rounded border-zinc-300 text-[#0f6259] focus:ring-[#0f6259] cursor-pointer" />
+            <span>Derivar</span>
+          </label>
+        </div>
+        <div class="md:col-span-1 flex justify-end">
+          <button type="submit" class="w-full px-3 py-1.5 bg-[#0f6259] hover:bg-[#0b4f48] text-white text-xs font-semibold rounded-lg transition cursor-pointer">
+            Añadir
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <!-- Main Task Table -->
+    <div class="bg-white rounded-xl border border-zinc-200/90 shadow-2xs overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-zinc-200/90 bg-zinc-50/40 text-[11px] font-medium text-zinc-500 mono-label uppercase">
+              <th class="py-3 pl-3 pr-1 w-16"></th>
+              <th class="py-3 px-3 min-w-[270px]">TAREA Y UBICACIÓN</th>
+              <th class="py-3 px-3 w-32">PRIORIDAD</th>
+              <th class="py-3 px-3 w-36">ESTADO</th>
+              <th class="py-3 px-3 w-36">RESPONSABLE</th>
+              <th class="py-3 px-3 w-36">FECHA LÍMITE</th>
+              <th class="py-3 px-3 w-20 text-center">DERIVAR</th>
+              <th class="py-3 pl-2 pr-4 w-20 text-right">ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody id="taskTableBody" class="divide-y divide-zinc-200/75 text-sm"></tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden py-14 px-4 text-center">
+        <p class="text-zinc-600 font-medium mb-1">No hay tareas que coincidan con estos filtros</p>
+        <p class="text-xs text-zinc-400 mb-4">Prueba a cambiar los filtros o añade una nueva tarea arriba.</p>
+        <button onclick="resetFilters()" class="px-3.5 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-lg hover:bg-zinc-800 cursor-pointer">
+          Mostrar todas las tareas
+        </button>
+      </div>
+    </div>
+
+    <!-- Footer Note -->
+    <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-zinc-400 px-1">
+      <span>Los cambios se guardan automáticamente en este navegador. Exporta a Excel para copias de seguridad.</span>
+      <button onclick="restoreDemoData()" class="text-left sm:text-right hover:text-zinc-600 underline cursor-pointer">
+        Restaurar datos de ejemplo
+      </button>
+    </div>
+  </div>
+
+  <!-- Datalist for Assignees -->
+  <datalist id="assigneesDatalist">
+    <option value="Yo"></option>
+    <option value="Conserjería"></option>
+    <option value="Mantenimiento"></option>
+    <option value="Electricista"></option>
+    <option value="Jardinería"></option>
+    <option value="Carpintería"></option>
+    <option value="Dirección"></option>
+  </datalist>
+
+  <!-- MODAL: Nueva / Editar Tarea -->
+  <div id="taskModal" class="hidden fixed inset-0 z-50 bg-zinc-900/45 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-xl w-full max-w-lg overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+        <h2 id="taskModalTitle" class="text-lg font-bold text-zinc-900">Nueva tarea</h2>
+        <button onclick="closeTaskModal()" class="text-zinc-400 hover:text-zinc-600 text-lg leading-none cursor-pointer">✕</button>
+      </div>
+
+      <form id="taskForm" onsubmit="saveTaskFromModal(event)" class="p-6 space-y-4">
+        <input type="hidden" id="editTaskId" />
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-700 mb-1">Título de la tarea *</label>
+          <input id="fieldTitle" type="text" required placeholder="Ej. Revisar persiana del aula 3º B" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">Ubicación / Aula / Zona</label>
+            <input id="fieldLocation" type="text" placeholder="Ej. 4º ESO A / Patio" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">Nota de pedido / Subtexto</label>
+            <input id="fieldNote" type="text" placeholder="Ej. Pedida 18 sept / Urgente" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">Prioridad</label>
+            <select id="fieldPriority" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm bg-white focus:outline-none focus:border-[#0f6259]">
+              <option value="Alta">Alta</option>
+              <option value="Media">Media</option>
+              <option value="Baja">Baja</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">Estado</label>
+            <select id="fieldStatus" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm bg-white focus:outline-none focus:border-[#0f6259]">
+              <option value="Pendiente">Pendiente</option>
+              <option value="En curso">En curso</option>
+              <option value="Bloqueada">Bloqueada</option>
+              <option value="Hecha">Hecha</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">Responsable</label>
+            <input id="fieldAssignee" type="text" list="assigneesDatalist" placeholder="Yo" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-center pt-1">
+          <div>
+            <label class="block text-xs font-semibold text-zinc-700 mb-1">Fecha límite</label>
+            <input id="fieldDeadline" type="date" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+          </div>
+
+          <div class="pt-4">
+            <label class="inline-flex items-center gap-2.5 cursor-pointer select-none">
+              <input id="fieldDerivar" type="checkbox" class="w-4 h-4 rounded border-zinc-300 text-[#0f6259] focus:ring-[#0f6259]" />
+              <span class="text-sm text-zinc-700 font-medium">Marcar para derivar a otro</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-zinc-100">
+          <button type="button" onclick="closeTaskModal()" class="px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 rounded-lg cursor-pointer">
+            Cancelar
+          </button>
+          <button id="saveAndNewBtn" type="button" onclick="saveTaskAndKeepOpen()" class="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-sm font-medium rounded-lg cursor-pointer">
+            Guardar y añadir otra
+          </button>
+          <button type="submit" class="px-4 py-2 bg-[#0f6259] hover:bg-[#0b4f48] text-white text-sm font-medium rounded-lg cursor-pointer">
+            Guardar tarea
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Importar / Exportar Excel -->
+  <div id="excelModal" class="hidden fixed inset-0 z-50 bg-zinc-900/45 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-xl w-full max-w-lg overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+        <h2 class="text-lg font-bold text-zinc-900">Importar o Exportar Excel</h2>
+        <button onclick="closeExcelModal()" class="text-zinc-400 hover:text-zinc-600 text-lg leading-none cursor-pointer">✕</button>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200/80">
+          <h3 class="text-sm font-semibold text-zinc-900 mb-1">1. Exportar listado actual a Excel (.xlsx)</h3>
+          <p class="text-xs text-zinc-500 mb-3">Descarga todas tus tareas actuales con su orden, prioridades, estados, fechas límite y derivaciones.</p>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="exportToExcel(false)" class="px-3.5 py-2 bg-[#0f6259] hover:bg-[#0b4f48] text-white text-xs font-medium rounded-lg cursor-pointer">
+              Descargar Excel con mis tareas
+            </button>
+            <button onclick="exportToExcel(true)" class="px-3.5 py-2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 text-xs font-medium rounded-lg cursor-pointer">
+              Descargar plantilla vacía (.xlsx)
+            </button>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200/80">
+          <h3 class="text-sm font-semibold text-zinc-900 mb-1">2. Importar desde archivo Excel (.xlsx, .xls, .csv)</h3>
+          <p class="text-xs text-zinc-500 mb-3">
+            Columnas reconocidas: <span class="font-mono text-zinc-700">Tarea, Ubicacion, Nota, Prioridad, Estado, Responsable, Fecha Limite, Derivar</span>.
+          </p>
+
+          <div class="flex items-center gap-3 mb-3 text-xs text-zinc-700">
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="importMode" value="append" checked class="text-[#0f6259]" />
+              Añadir a las actuales
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="importMode" value="replace" class="text-[#0f6259]" />
+              Reemplazar lista completa
+            </label>
+          </div>
+
+          <input id="excelFileInput" type="file" accept=".xlsx,.xls,.csv" onchange="handleExcelImport(event)" class="block w-full text-xs text-zinc-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-900 file:text-white hover:file:bg-zinc-800 file:cursor-pointer" />
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-zinc-50 border-t border-zinc-100 flex justify-end">
+        <button onclick="closeExcelModal()" class="px-4 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-200/70 rounded-lg cursor-pointer">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 hidden bg-zinc-900 text-white text-xs font-medium px-4 py-2.5 rounded-lg shadow-lg"></div>
+
+  <script>
+    const STORAGE_KEY = 'mis_trabajos_tasks_v2';
+
+    const DEFAULT_TASKS = [
+      {
+        id: 't-1',
+        title: 'Pintar os módulos do xardín- xogo de auga.',
+        location: 'xardín de infantil',
+        note: 'cando sexa posible, pero sen deixalo pasar.',
+        priority: 'Baja',
+        status: 'Pendiente',
+        assignee: 'Yo',
+        deadline: '',
+        derivar: false,
+        order: 1
+      },
+      {
+        id: 't-2',
+        title: 'Cortar maleza que entra en la pista',
+        location: 'Pista de futbol',
+        note: 'Pedida 6 nov',
+        priority: 'Alta',
+        status: 'Pendiente',
+        assignee: 'Yo',
+        deadline: '',
+        derivar: false,
+        order: 2
+      },
+      {
+        id: 't-3',
+        title: 'Barnizar os mobles da cociña da aula de 5º B.',
+        location: '5º EI B',
+        note: 'nunhas vacacións longas.',
+        priority: 'Baja',
+        status: 'Pendiente',
+        assignee: 'Yo',
+        deadline: '',
+        derivar: false,
+        order: 3
+      },
+      {
+        id: 't-4',
+        title: 'Teriamos que soprar arredor dos dous areeiros todos os dias, para que a area quede dentro e non invada o cemento',
+        location: '',
+        note: 'Pedida 18 sept',
+        priority: 'Alta',
+        status: 'Pendiente',
+        assignee: 'Yo',
+        deadline: '',
+        derivar: false,
+        order: 4
+      },
+      {
+        id: 't-5',
+        title: 'Caeu un estor.',
+        location: '4ºESO A',
+        note: '',
+        priority: 'Alta',
+        status: 'Pendiente',
+        assignee: 'Yo',
+        deadline: '',
+        derivar: false,
+        order: 5
+      },
+      {
+        id: 't-6',
+        title: 'Luces do medio no teito',
+        location: 'EI, aula Vero',
+        note: 'Pedida 21 sept',
+        priority: 'Alta',
+        status: 'Pendiente',
+        assignee: 'Yo',
+        deadline: '',
+        derivar: false,
+        order: 6
+      },
+      {
+        id: 't-7',
+        title: '- poñer os peches das portas dos armarios brancos',
+        location: 'Aula 3º B',
+        note: '',
+        priority: 'Media',
+        status: 'Pendiente',
+        assignee: 'Yo',
+        deadline: '',
+        derivar: false,
+        order: 7
+      }
+    ];
+
+    let tasks = [];
+    let statusFilter = 'Abiertas';
+    let onlyDelegated = false;
+    let onlyOverdue = false;
+    let draggedTaskId = null;
+
+    function init() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          tasks = JSON.parse(saved);
+        } catch (e) {
+          tasks = structuredClone(DEFAULT_TASKS);
+        }
+      } else {
+        tasks = structuredClone(DEFAULT_TASKS);
+        saveTasks();
+      }
+      updateHeaderDate();
+      render();
+    }
+
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    function updateHeaderDate() {
+      const now = new Date();
+      const dias = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+      const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+      const str = `${dias[now.getDay()]}, ${now.getDate()} DE ${meses[now.getMonth()]}`;
+      document.getElementById('currentDateLabel').textContent = str;
+    }
+
+    function todayISO() {
+      const d = new Date();
+      const off = d.getTimezoneOffset();
+      const local = new Date(d.getTime() - off * 60 * 1000);
+      return local.toISOString().split('T')[0];
+    }
+
+    function isOverdue(task) {
+      if (!task.deadline || task.status === 'Hecha') return false;
+      return task.deadline < todayISO();
+    }
+
+    function isDueToday(task) {
+      if (!task.deadline || task.status === 'Hecha') return false;
+      return task.deadline === todayISO();
+    }
+
+    function formatDeadlineLabel(isoDate) {
+      if (!isoDate) return 'Sin fecha';
+      const parts = isoDate.split('-');
+      if (parts.length !== 3) return isoDate;
+      const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'];
+      const day = parseInt(parts[2], 10);
+      const month = meses[parseInt(parts[1], 10) - 1] || parts[1];
+      const currentYear = new Date().getFullYear().toString();
+      return parts[0] === currentYear ? `${day} ${month}` : `${day} ${month} ${parts[0]}`;
+    }
+
+    function render() {
+      updateKPIs();
+      updateStatusPills();
+      updateAssigneeDropdown();
+
+      const sortMode = document.getElementById('sortModeSelect').value;
+      const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+      const prioFilter = document.getElementById('priorityFilter').value;
+      const assigneeFilter = document.getElementById('assigneeFilter').value;
+
+      document.getElementById('clearSearchBtn').classList.toggle('hidden', !searchVal);
+      document.getElementById('dragHint').classList.toggle('hidden', sortMode === 'deadline_asc');
+
+      const hasActiveFilters =
+        statusFilter !== 'Abiertas' ||
+        prioFilter !== 'ALL' ||
+        assigneeFilter !== 'ALL' ||
+        onlyDelegated ||
+        onlyOverdue ||
+        searchVal !== '';
+      document.getElementById('resetFiltersBtn').classList.toggle('hidden', !hasActiveFilters);
+
+      document.getElementById('onlyDelegatedBtn').className = onlyDelegated
+        ? 'px-3 py-1.5 bg-zinc-900 text-white border border-zinc-900 rounded-lg text-sm font-medium transition cursor-pointer'
+        : 'px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition cursor-pointer';
+
+      document.getElementById('onlyOverdueBtn').className = onlyOverdue
+        ? 'px-3 py-1.5 bg-red-700 text-white border border-red-700 rounded-lg text-sm font-medium transition cursor-pointer'
+        : 'px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition cursor-pointer';
+
+      let filtered = tasks.filter(t => {
+        if (statusFilter === 'Abiertas' && t.status === 'Hecha') return false;
+        if (statusFilter === 'Hechas' && t.status !== 'Hecha') return false;
+        if (['Pendiente', 'En curso', 'Bloqueada'].includes(statusFilter) && t.status !== statusFilter) return false;
+        if (prioFilter !== 'ALL' && t.priority !== prioFilter) return false;
+        if (assigneeFilter !== 'ALL' && (t.assignee || 'Yo') !== assigneeFilter) return false;
+        if (onlyDelegated && !t.derivar) return false;
+        if (onlyOverdue && !isOverdue(t)) return false;
+
+        if (searchVal) {
+          const hay = `${t.title} ${t.location || ''} ${t.note || ''} ${t.assignee || ''}`.toLowerCase();
+          if (!hay.includes(searchVal)) return false;
+        }
+        return true;
+      });
+
+      const tbody = document.getElementById('taskTableBody');
+      const emptyState = document.getElementById('emptyState');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      if (sortMode === 'group_priority') {
+        const groups = ['Alta', 'Media', 'Baja'];
+        let html = '';
+        groups.forEach(prio => {
+          const groupTasks = filtered
+            .filter(t => t.priority === prio)
+            .sort((a, b) => a.order - b.order);
+
+          const badgeColors = {
+            Alta: 'bg-red-100 text-red-800 border-red-200',
+            Media: 'bg-amber-100 text-amber-800 border-amber-200',
+            Baja: 'bg-slate-200 text-slate-700 border-slate-300'
+          };
+
+          html += `
+            <tr class="bg-zinc-100/90 border-y border-zinc-200/90"
+                ondragover="handleGroupDragOver(event)"
+                ondrop="handleGroupDrop(event, '${prio}')">
+              <td colspan="8" class="py-2 px-4">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badgeColors[prio]}">
+                      Prioridad ${prio}
+                    </span>
+                    <span class="text-xs text-zinc-500 font-medium">${groupTasks.length} ${groupTasks.length === 1 ? 'tarea' : 'tareas'}</span>
+                  </div>
+                  <span class="text-[11px] text-zinc-400">Arrastra tareas aquí o reordena dentro del bloque</span>
+                </div>
+              </td>
+            </tr>
+          `;
+
+          if (groupTasks.length === 0) {
+            html += `
+              <tr ondragover="handleGroupDragOver(event)" ondrop="handleGroupDrop(event, '${prio}')">
+                <td colspan="8" class="py-3 px-6 text-xs text-zinc-400 italic">
+                  Sin tareas en prioridad ${prio.toLowerCase()} (arrastra una tarea aquí para cambiar su prioridad)
+                </td>
+              </tr>
+            `;
+          } else {
+            groupTasks.forEach(t => {
+              html += renderTaskRow(t, true);
+            });
+          }
+        });
+        tbody.innerHTML = html;
+      } else if (sortMode === 'deadline_asc') {
+        filtered.sort((a, b) => {
+          if (!a.deadline && !b.deadline) return a.order - b.order;
+          if (!a.deadline) return 1;
+          if (!b.deadline) return -1;
+          return a.deadline.localeCompare(b.deadline) || a.order - b.order;
+        });
+        tbody.innerHTML = filtered.map(t => renderTaskRow(t, false)).join('');
+      } else {
+        filtered.sort((a, b) => a.order - b.order);
+        tbody.innerHTML = filtered.map(t => renderTaskRow(t, true)).join('');
+      }
+    }
+
+    function renderTaskRow(task, allowDrag) {
+      const done = task.status === 'Hecha';
+      const overdue = isOverdue(task);
+      const dueToday = isDueToday(task);
+
+      const prioStyles = {
+        Alta: 'bg-[#fae3e3] text-[#b91c1c] hover:bg-[#f6d0d0]',
+        Media: 'bg-[#fef0c7] text-[#b45309] hover:bg-[#fde6a2]',
+        Baja: 'bg-[#ebeef2] text-[#475569] hover:bg-[#dfe4eb]'
+      };
+
+      const statusStyles = {
+        'Pendiente': 'bg-[#ebeef2] text-[#334155]',
+        'En curso': 'bg-[#dbeafe] text-[#1d4ed8]',
+        'Bloqueada': 'bg-[#fee2e2] text-[#b91c1c]',
+        'Hecha': 'bg-[#dcfce7] text-[#15803d]'
+      };
+
+      const subParts = [];
+      if (task.location) subParts.push(escapeHtml(task.location));
+      if (task.note) subParts.push(escapeHtml(task.note));
+
+      return `
+        <tr
+          data-id="${task.id}"
+          draggable="${allowDrag}"
+          ondragstart="handleDragStart(event, '${task.id}')"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDrop(event, '${task.id}')"
+          ondragend="handleDragEnd(event)"
+          class="group transition-colors ${done ? 'bg-zinc-50/70 opacity-70' : 'hover:bg-zinc-50/80'}"
+        >
+          <!-- Drag Handle + Move Up/Down + Complete Checkbox -->
+          <td class="py-3.5 pl-3 pr-1 align-top">
+            <div class="flex items-center gap-1.5 pt-0.5">
+              <div class="flex items-center">
+                <span title="${allowDrag ? 'Arrastrar para mover' : 'Cambia a orden manual para arrastrar'}"
+                      class="${allowDrag ? 'cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-700' : 'text-zinc-200 cursor-not-allowed'} select-none px-0.5 text-base leading-none">
+                  ≡
+                </span>
+                ${allowDrag ? `
+                  <div class="flex flex-col sm:hidden ml-0.5">
+                    <button onclick="moveTaskStep('${task.id}', -1)" title="Subir" class="text-[9px] leading-none text-zinc-400 hover:text-zinc-800 px-0.5">▲</button>
+                    <button onclick="moveTaskStep('${task.id}', 1)" title="Bajar" class="text-[9px] leading-none text-zinc-400 hover:text-zinc-800 px-0.5">▼</button>
+                  </div>
+                ` : ''}
+              </div>
+              <input
+                type="checkbox"
+                ${done ? 'checked' : ''}
+                onchange="toggleTaskDone('${task.id}')"
+                title="Marcar como hecha"
+                class="w-4 h-4 rounded border-zinc-300 text-[#0f6259] focus:ring-[#0f6259] cursor-pointer"
+              />
+            </div>
+          </td>
+
+          <!-- Task Title, Location, Note -->
+          <td class="py-3.5 px-3 align-top">
+            <div onclick="openTaskModal('${task.id}')" class="cursor-pointer">
+              <div class="font-semibold text-[14px] leading-snug ${done ? 'line-through text-zinc-400' : 'text-zinc-900'}">
+                ${escapeHtml(task.title)}
+              </div>
+              ${subParts.length ? `
+                <div class="text-xs text-zinc-500 mt-0.5 leading-relaxed">
+                  ${subParts.join(' &nbsp;·&nbsp; ')}
+                </div>
+              ` : ''}
+            </div>
+          </td>
+
+          <!-- Priority Pill (Click to cycle) -->
+          <td class="py-3.5 px-3 align-top">
+            <button
+              onclick="cyclePriority('${task.id}')"
+              title="Clic para cambiar prioridad (Alta › Media › Baja)"
+              class="inline-flex items-center justify-center min-w-[74px] px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${prioStyles[task.priority] || prioStyles.Media}"
+            >
+              ${task.priority}
+            </button>
+          </td>
+
+          <!-- Status Pill (Inline Select) -->
+          <td class="py-3.5 px-3 align-top">
+            <select
+              onchange="updateTaskField('${task.id}', 'status', this.value)"
+              class="px-3 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-[#0f6259] cursor-pointer ${statusStyles[task.status] || statusStyles['Pendiente']}"
+            >
+              <option value="Pendiente" ${task.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+              <option value="En curso" ${task.status === 'En curso' ? 'selected' : ''}>En curso</option>
+              <option value="Bloqueada" ${task.status === 'Bloqueada' ? 'selected' : ''}>Bloqueada</option>
+              <option value="Hecha" ${task.status === 'Hecha' ? 'selected' : ''}>Hecha</option>
+            </select>
+          </td>
+
+          <!-- Assignee (Inline Editable) -->
+          <td class="py-3.5 px-3 align-top">
+            <input
+              type="text"
+              list="assigneesDatalist"
+              value="${escapeHtml(task.assignee || 'Yo')}"
+              onchange="updateTaskField('${task.id}', 'assignee', this.value.trim() || 'Yo')"
+              class="w-28 bg-transparent hover:bg-zinc-100 focus:bg-white px-2 py-1 -ml-2 rounded text-xs font-medium text-zinc-700 border border-transparent focus:border-zinc-300 focus:outline-none"
+            />
+          </td>
+
+          <!-- Deadline (Inline Date Trigger) -->
+          <td class="py-3.5 px-3 align-top">
+            <div class="relative inline-flex items-center">
+              <span class="text-xs font-medium ${overdue ? 'text-red-700 font-semibold' : dueToday ? 'text-amber-700 font-semibold' : task.deadline ? 'text-zinc-700' : 'text-zinc-400'}">
+                ${formatDeadlineLabel(task.deadline)}${overdue ? ' (Vencida)' : dueToday ? ' (Hoy)' : ''}
+              </span>
+              <input
+                type="date"
+                value="${task.deadline || ''}"
+                onchange="updateTaskField('${task.id}', 'deadline', this.value)"
+                title="Cambiar fecha límite"
+                class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+              />
+            </div>
+          </td>
+
+          <!-- Derivar Checkbox -->
+          <td class="py-3.5 px-3 align-top text-center">
+            <input
+              type="checkbox"
+              ${task.derivar ? 'checked' : ''}
+              onchange="toggleDerivar('${task.id}', this.checked)"
+              title="Marcar para derivar"
+              class="w-4 h-4 mt-1 rounded border-zinc-300 text-[#0f6259] focus:ring-[#0f6259] cursor-pointer"
+            />
+          </td>
+
+          <!-- Actions -->
+          <td class="py-3.5 pl-2 pr-4 align-top text-right">
+            <div class="inline-flex items-center gap-1 opacity-70 group-hover:opacity-100 transition">
+              <button onclick="openTaskModal('${task.id}')" title="Editar tarea" class="p-1 text-zinc-500 hover:text-zinc-900 rounded cursor-pointer">
+                ✎
+              </button>
+              <button onclick="deleteTask('${task.id}')" title="Eliminar tarea" class="p-1 text-zinc-400 hover:text-red-600 rounded cursor-pointer">
+                🗑
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function updateKPIs() {
+      const total = tasks.length;
+      const done = tasks.filter(t => t.status === 'Hecha').length;
+      const openTasks = tasks.filter(t => t.status !== 'Hecha');
+      const highPrio = openTasks.filter(t => t.priority === 'Alta').length;
+      const overdue = openTasks.filter(t => isOverdue(t)).length;
+      const toDelegate = openTasks.filter(t => t.derivar).length;
+
+      document.getElementById('kpiAbiertas').textContent = openTasks.length;
+      document.getElementById('kpiAlta').textContent = highPrio;
+      document.getElementById('kpiVencidas').textContent = overdue;
+      document.getElementById('kpiDerivar').textContent = toDelegate;
+
+      document.getElementById('progressText').textContent = `${done}/${total} completadas`;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+    }
+
+    function updateStatusPills() {
+      const counts = {
+        'Abiertas': tasks.filter(t => t.status !== 'Hecha').length,
+        'Pendiente': tasks.filter(t => t.status === 'Pendiente').length,
+        'En curso': tasks.filter(t => t.status === 'En curso').length,
+        'Bloqueada': tasks.filter(t => t.status === 'Bloqueada').length,
+        'Hechas': tasks.filter(t => t.status === 'Hecha').length
+      };
+
+      const container = document.getElementById('statusPills');
+      container.innerHTML = Object.entries(counts).map(([label, count]) => {
+        const active = statusFilter === label;
+        return `
+          <button
+            onclick="setStatusFilter('${label}')"
+            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              active
+                ? 'bg-[#18181b] text-white shadow-2xs'
+                : 'bg-transparent text-zinc-600 hover:bg-zinc-200/60'
+            }"
+          >
+            ${label} <span class="ml-1 ${active ? 'text-zinc-300' : 'text-zinc-400'}">${count}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function updateAssigneeDropdown() {
+      const select = document.getElementById('assigneeFilter');
+      const current = select.value;
+      const unique = Array.from(new Set(tasks.map(t => t.assignee || 'Yo'))).sort();
+
+      select.innerHTML = `<option value="ALL">Todos los responsables</option>` +
+        unique.map(name => `<option value="${escapeHtml(name)}" ${name === current ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
+    }
+
+    // Quick Inline Add Handler
+    function handleQuickAdd(e) {
+      e.preventDefault();
+      const titleInput = document.getElementById('qaTitle');
+      const title = titleInput.value.trim();
+      if (!title) return;
+
+      const location = document.getElementById('qaLocation').value.trim();
+      const priority = document.getElementById('qaPriority').value;
+      const assignee = document.getElementById('qaAssignee').value.trim() || 'Yo';
+      const deadline = document.getElementById('qaDeadline').value;
+      const derivar = document.getElementById('qaDerivar').checked;
+
+      const minOrder = tasks.length ? Math.min(...tasks.map(t => t.order)) : 1;
+      tasks.unshift({
+        id: 't-' + Date.now(),
+        title,
+        location,
+        note: '',
+        priority,
+        status: 'Pendiente',
+        assignee,
+        deadline,
+        derivar,
+        order: minOrder - 1
+      });
+
+      saveTasks();
+      titleInput.value = '';
+      document.getElementById('qaLocation').value = '';
+      document.getElementById('qaDeadline').value = '';
+      document.getElementById('qaDerivar').checked = false;
+      titleInput.focus();
+
+      render();
+      showToast('Tarea añadida');
+    }
+
+    // Filter Actions
+    function setStatusFilter(status) {
+      statusFilter = status;
+      render();
+    }
+
+    function filterByHighPriority() {
+      statusFilter = 'Abiertas';
+      document.getElementById('priorityFilter').value = 'Alta';
+      render();
+    }
+
+    function filterByOverdue() {
+      statusFilter = 'Abiertas';
+      onlyOverdue = true;
+      onlyDelegated = false;
+      render();
+    }
+
+    function filterByDelegated() {
+      statusFilter = 'Abiertas';
+      onlyDelegated = true;
+      onlyOverdue = false;
+      render();
+    }
+
+    function toggleOnlyDelegated() {
+      onlyDelegated = !onlyDelegated;
+      render();
+    }
+
+    function toggleOnlyOverdue() {
+      onlyOverdue = !onlyOverdue;
+      render();
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      render();
+    }
+
+    function resetFilters() {
+      statusFilter = 'Abiertas';
+      onlyDelegated = false;
+      onlyOverdue = false;
+      document.getElementById('searchInput').value = '';
+      document.getElementById('priorityFilter').value = 'ALL';
+      document.getElementById('assigneeFilter').value = 'ALL';
+      render();
+    }
+
+    function handleSortModeChange() {
+      render();
+    }
+
+    // Inline Task Mutations
+    function cyclePriority(id) {
+      const order = ['Alta', 'Media', 'Baja'];
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      const next = order[(order.indexOf(task.priority) + 1) % order.length];
+      task.priority = next;
+      saveTasks();
+      render();
+    }
+
+    function toggleTaskDone(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      task.status = task.status === 'Hecha' ? 'Pendiente' : 'Hecha';
+      saveTasks();
+      render();
+    }
+
+    function toggleDerivar(id, checked) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      task.derivar = checked;
+      saveTasks();
+      render();
+      if (checked && (task.assignee === 'Yo' || !task.assignee)) {
+        showToast('Marcada para derivar: asigna un responsable en la columna Responsable');
+      }
+    }
+
+    function updateTaskField(id, field, value) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      task[field] = value;
+      saveTasks();
+      render();
+    }
+
+    function deleteTask(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+      render();
+      showToast('Tarea eliminada');
+    }
+
+    // Step Reorder for Touch / Mobile
+    function moveTaskStep(id, direction) {
+      const ordered = [...tasks].sort((a, b) => a.order - b.order);
+      const idx = ordered.findIndex(t => t.id === id);
+      const targetIdx = idx + direction;
+      if (idx === -1 || targetIdx < 0 || targetIdx >= ordered.length) return;
+
+      const [moved] = ordered.splice(idx, 1);
+      ordered.splice(targetIdx, 0, moved);
+      ordered.forEach((t, i) => { t.order = i + 1; });
+
+      tasks = ordered;
+      saveTasks();
+      render();
+    }
+
+    // Drag & Drop Individual Priority Reordering
+    function handleDragStart(e, id) {
+      draggedTaskId = id;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', id);
+      setTimeout(() => {
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (row) row.classList.add('dragging-row');
+      }, 0);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const row = e.currentTarget;
+      const rect = row.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+      if (e.clientY < midY) {
+        row.classList.add('drag-over-top');
+      } else {
+        row.classList.add('drag-over-bottom');
+      }
+    }
+
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+
+    function handleDrop(e, targetId) {
+      e.preventDefault();
+      const row = e.currentTarget;
+      const insertBefore = row.classList.contains('drag-over-top');
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+
+      if (!draggedTaskId || draggedTaskId === targetId) return;
+
+      const ordered = [...tasks].sort((a, b) => a.order - b.order);
+      const fromIndex = ordered.findIndex(t => t.id === draggedTaskId);
+      const targetIndex = ordered.findIndex(t => t.id === targetId);
+      if (fromIndex === -1 || targetIndex === -1) return;
+
+      const [movedTask] = ordered.splice(fromIndex, 1);
+
+      // If grouped by priority, moving onto a task in another priority group updates its priority too
+      const sortMode = document.getElementById('sortModeSelect').value;
+      const targetTask = tasks.find(t => t.id === targetId);
+      if (sortMode === 'group_priority' && targetTask && movedTask.priority !== targetTask.priority) {
+        movedTask.priority = targetTask.priority;
+        showToast(`Prioridad cambiada a ${targetTask.priority}`);
+      }
+
+      const newTargetIndex = ordered.findIndex(t => t.id === targetId);
+      const insertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
+      ordered.splice(insertIndex, 0, movedTask);
+
+      ordered.forEach((t, idx) => {
+        t.order = idx + 1;
+      });
+
+      tasks = ordered;
+      saveTasks();
+      render();
+    }
+
+    function handleGroupDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleGroupDrop(e, targetPriority) {
+      e.preventDefault();
+      if (!draggedTaskId) return;
+      const task = tasks.find(t => t.id === draggedTaskId);
+      if (task && task.priority !== targetPriority) {
+        task.priority = targetPriority;
+        saveTasks();
+        render();
+        showToast(`Movida a prioridad ${targetPriority}`);
+      }
+    }
+
+    function handleDragEnd() {
+      draggedTaskId = null;
+      document.querySelectorAll('tr').forEach(r => {
+        r.classList.remove('dragging-row', 'drag-over-top', 'drag-over-bottom');
+      });
+    }
+
+    // Task Modal
+    function openTaskModal(id = null) {
+      const modal = document.getElementById('taskModal');
+      const saveAndNewBtn = document.getElementById('saveAndNewBtn');
+      document.getElementById('taskForm').reset();
+
+      if (id) {
+        const t = tasks.find(item => item.id === id);
+        if (!t) return;
+        document.getElementById('taskModalTitle').textContent = 'Editar tarea';
+        document.getElementById('editTaskId').value = t.id;
+        document.getElementById('fieldTitle').value = t.title;
+        document.getElementById('fieldLocation').value = t.location || '';
+        document.getElementById('fieldNote').value = t.note || '';
+        document.getElementById('fieldPriority').value = t.priority;
+        document.getElementById('fieldStatus').value = t.status;
+        document.getElementById('fieldAssignee').value = t.assignee || 'Yo';
+        document.getElementById('fieldDeadline').value = t.deadline || '';
+        document.getElementById('fieldDerivar').checked = !!t.derivar;
+        saveAndNewBtn.classList.add('hidden');
+      } else {
+        document.getElementById('taskModalTitle').textContent = 'Nueva tarea';
+        document.getElementById('editTaskId').value = '';
+        document.getElementById('fieldPriority').value = 'Media';
+        document.getElementById('fieldStatus').value = 'Pendiente';
+        document.getElementById('fieldAssignee').value = 'Yo';
+        saveAndNewBtn.classList.remove('hidden');
+      }
+
+      modal.classList.remove('hidden');
+      setTimeout(() => document.getElementById('fieldTitle').focus(), 50);
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.add('hidden');
+    }
+
+    function persistModalForm() {
+      const titleInput = document.getElementById('fieldTitle');
+      if (!titleInput.value.trim()) {
+        titleInput.reportValidity();
+        return false;
+      }
+
+      const id = document.getElementById('editTaskId').value;
+      const data = {
+        title: titleInput.value.trim(),
+        location: document.getElementById('fieldLocation').value.trim(),
+        note: document.getElementById('fieldNote').value.trim(),
+        priority: document.getElementById('fieldPriority').value,
+        status: document.getElementById('fieldStatus').value,
+        assignee: document.getElementById('fieldAssignee').value.trim() || 'Yo',
+        deadline: document.getElementById('fieldDeadline').value,
+        derivar: document.getElementById('fieldDerivar').checked
+      };
+
+      if (id) {
+        const idx = tasks.findIndex(t => t.id === id);
+        if (idx !== -1) {
+          tasks[idx] = { ...tasks[idx], ...data };
+        }
+        showToast('Tarea actualizada');
+      } else {
+        const minOrder = tasks.length ? Math.min(...tasks.map(t => t.order)) : 1;
+        tasks.unshift({
+          id: 't-' + Date.now(),
+          ...data,
+          order: minOrder - 1
+        });
+        showToast('Tarea creada');
+      }
+
+      saveTasks();
+      render();
+      return true;
+    }
+
+    function saveTaskFromModal(e) {
+      e.preventDefault();
+      if (persistModalForm()) {
+        closeTaskModal();
+      }
+    }
+
+    function saveTaskAndKeepOpen() {
+      if (persistModalForm()) {
+        const lastPriority = document.getElementById('fieldPriority').value;
+        const lastAssignee = document.getElementById('fieldAssignee').value;
+        document.getElementById('taskForm').reset();
+        document.getElementById('editTaskId').value = '';
+        document.getElementById('fieldPriority').value = lastPriority;
+        document.getElementById('fieldStatus').value = 'Pendiente';
+        document.getElementById('fieldAssignee').value = lastAssignee || 'Yo';
+        document.getElementById('fieldTitle').focus();
+      }
+    }
+
+    // Excel Import & Export
+    function openExcelModal() {
+      document.getElementById('excelFileInput').value = '';
+      document.getElementById('excelModal').classList.remove('hidden');
+    }
+
+    function closeExcelModal() {
+      document.getElementById('excelModal').classList.add('hidden');
+    }
+
+    function exportToExcel(emptyTemplate = false) {
+      const ordered = [...tasks].sort((a, b) => a.order - b.order);
+      const rows = emptyTemplate
+        ? [{
+            'Tarea': 'Ejemplo: Revisar persiana aula 2º A',
+            'Ubicacion': '2º ESO A',
+            'Nota': 'Pedida hoy',
+            'Prioridad': 'Alta',
+            'Estado': 'Pendiente',
+            'Responsable': 'Yo',
+            'Fecha Limite': todayISO(),
+            'Derivar': 'No'
+          }]
+        : ordered.map(t => ({
+            'Tarea': t.title,
+            'Ubicacion': t.location || '',
+            'Nota': t.note || '',
+            'Prioridad': t.priority,
+            'Estado': t.status,
+            'Responsable': t.assignee || 'Yo',
+            'Fecha Limite': t.deadline || '',
+            'Derivar': t.derivar ? 'Sí' : 'No'
+          }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 48 }, { wch: 22 }, { wch: 28 }, { wch: 12 },
+        { wch: 14 }, { wch: 18 }, { wch: 15 }, { wch: 10 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Mis trabajos');
+      const filename = emptyTemplate ? 'plantilla_mis_trabajos.xlsx' : `mis_trabajos_${todayISO()}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      showToast('Archivo Excel descargado');
+    }
+
+    function handleExcelImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const mode = document.querySelector('input[name="importMode"]:checked').value;
+      const reader = new FileReader();
+
+      reader.onload = function(evt) {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+          if (!jsonRows.length) {
+            showToast('El archivo está vacío');
+            return;
+          }
+
+          const imported = jsonRows.map((row, index) => {
+            const norm = {};
+            Object.keys(row).forEach(k => {
+              norm[k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()] = row[k];
+            });
+
+            const title = String(norm['tarea'] || norm['titulo'] || norm['trabajo'] || norm['descripcion'] || '').trim();
+            if (!title) return null;
+
+            const rawPrio = String(norm['prioridad'] || 'Media').toLowerCase();
+            let priority = 'Media';
+            if (rawPrio.includes('alt')) priority = 'Alta';
+            else if (rawPrio.includes('baj')) priority = 'Baja';
+
+            const rawStatus = String(norm['estado'] || 'Pendiente').toLowerCase();
+            let status = 'Pendiente';
+            if (rawStatus.includes('curso')) status = 'En curso';
+            else if (rawStatus.includes('bloq')) status = 'Bloqueada';
+            else if (rawStatus.includes('hech') || rawStatus.includes('comp')) status = 'Hecha';
+
+            const rawDerivar = String(norm['derivar'] || '').toLowerCase();
+            const derivar = ['si', 'sí', 'true', '1', 'x'].includes(rawDerivar);
+
+            let deadline = String(norm['fecha limite'] || norm['fecha'] || norm['limite'] || '').trim();
+            if (/^\d{5}$/.test(deadline)) {
+              const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+              const dt = new Date(excelEpoch.getTime() + Number(deadline) * 86400000);
+              deadline = dt.toISOString().split('T')[0];
+            }
+
+            return {
+              id: 'imp-' + Date.now() + '-' + index,
+              title,
+              location: String(norm['ubicacion'] || norm['aula'] || norm['lugar'] || '').trim(),
+              note: String(norm['nota'] || norm['notas'] || norm['observaciones'] || '').trim(),
+              priority,
+              status,
+              assignee: String(norm['responsable'] || norm['asignado'] || 'Yo').trim() || 'Yo',
+              deadline,
+              derivar,
+              order: index + 1
+            };
+          }).filter(Boolean);
+
+          if (!imported.length) {
+            showToast('No se encontraron filas con columna "Tarea"');
+            return;
+          }
+
+          if (mode === 'replace') {
+            tasks = imported;
+          } else {
+            const maxOrder = tasks.length ? Math.max(...tasks.map(t => t.order)) : 0;
+            imported.forEach((item, i) => { item.order = maxOrder + i + 1; });
+            tasks = [...tasks, ...imported];
+          }
+
+          saveTasks();
+          render();
+          closeExcelModal();
+          showToast(`${imported.length} tareas importadas desde Excel`);
+        } catch (err) {
+          console.error(err);
+          showToast('Error al leer el archivo Excel');
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    function restoreDemoData() {
+      tasks = structuredClone(DEFAULT_TASKS);
+      saveTasks();
+      resetFilters();
+      showToast('Datos de ejemplo restaurados');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.add('hidden'), 2800);
+    }
+
+    // Keyboard shortcuts: 'N' opens quick modal, 'Escape' closes modals
+    document.addEventListener('keydown', (e) => {
+      const tag = document.activeElement?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if (!typing && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        openTaskModal();
+      } else if (e.key === 'Escape') {
+        closeTaskModal();
+        closeExcelModal();
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>
