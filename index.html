@@ -1,0 +1,2167 @@
+<!DOCTYPE html>
+<html lang="gl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Os meus traballos · Andaina</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f4f5f6;
+      color: #18181b;
+    }
+
+    .mono-label {
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.05em;
+    }
+
+    .drag-over-top {
+      box-shadow: inset 0 3px 0 0 #0f6259 !important;
+      background-color: #f0fdf9 !important;
+    }
+    .drag-over-bottom {
+      box-shadow: inset 0 -3px 0 0 #0f6259 !important;
+      background-color: #f0fdf9 !important;
+    }
+    .dragging-row {
+      opacity: 0.45;
+      background-color: #e4e4e7 !important;
+    }
+
+    .delegated-row {
+      background-color: #fef9c3 !important;
+      box-shadow: inset 4px 0 0 0 #eab308;
+    }
+    .delegated-row:hover {
+      background-color: #fef08a !important;
+    }
+
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #d4d4d8;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a1a1aa;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-16">
+
+  <div class="max-w-[1220px] mx-auto px-4 sm:px-6 pt-7">
+
+    <!-- Top Header -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+      <!-- Left: Date, Title & Progress -->
+      <div class="shrink-0">
+        <div id="currentDateLabel" class="mono-label text-xs uppercase text-zinc-500 mb-1">
+          VENRES, 13 DE NOVEMBRO
+        </div>
+        <h1 id="appTitle" class="text-[28px] font-bold tracking-tight text-zinc-900 leading-tight">
+          Os meus traballos
+        </h1>
+        <div class="flex items-center gap-3 mt-1.5">
+          <span id="progressText" class="text-xs text-zinc-500 font-medium">0/0 completadas</span>
+          <div class="w-40 h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+            <div id="progressBar" class="h-full bg-[#0f6259] rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Logo Andaina -->
+      <div class="flex items-center justify-start lg:justify-center flex-1 py-1">
+        <div class="inline-flex items-center select-none" aria-label="Colexio Andaina">
+          <svg width="166" height="68" viewBox="0 0 215 88" fill="none" xmlns="http://www.w3.org/2000/svg" class="h-14 w-auto">
+            <text x="4" y="34" fill="#0088C2" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="35" letter-spacing="-1.2">anda</text>
+            <rect x="97" y="13" width="7.2" height="21" rx="1.5" fill="#FBB900"/>
+            <rect x="97" y="4" width="7.2" height="6.2" rx="1.2" fill="#0088C2"/>
+            <text x="108" y="34" fill="#0088C2" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="35" letter-spacing="-1.2">na</text>
+            <g stroke="#FBB900" stroke-width="5.2" stroke-linecap="round">
+              <line x1="81" y1="36" x2="71" y2="27"/>
+              <line x1="121" y1="36" x2="131" y2="27"/>
+              <line x1="72" y1="53" x2="58" y2="53"/>
+              <line x1="130" y1="53" x2="144" y2="53"/>
+              <line x1="81" y1="70" x2="71" y2="79"/>
+              <line x1="121" y1="70" x2="131" y2="79"/>
+              <line x1="101" y1="77" x2="101" y2="85"/>
+            </g>
+            <circle cx="101" cy="54" r="18.5" fill="#FBB900"/>
+            <text x="90" y="59" fill="#FFFFFF" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="14" transform="rotate(-14 96 54)">A</text>
+            <path d="M111 63 L118 69 L109 71 Z" fill="#f4f5f6"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Right: Language Switcher, Sync Status, Excel & New Task -->
+      <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div class="inline-flex items-center bg-white rounded-lg border border-zinc-200 p-0.5 shadow-2xs" title="Idioma / Lingua">
+          <button id="langGlBtn" onclick="setLanguage('gl')" class="px-2.5 py-1.5 text-xs font-semibold rounded-md transition cursor-pointer">
+            GL
+          </button>
+          <button id="langEsBtn" onclick="setLanguage('es')" class="px-2.5 py-1.5 text-xs font-semibold rounded-md transition cursor-pointer">
+            ES
+          </button>
+        </div>
+
+        <button id="syncNowBtn" onclick="syncFromGoogleSheet(true, false)" class="hidden inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-lg border border-emerald-200 transition cursor-pointer">
+          <span id="syncDot" class="w-2 h-2 rounded-full bg-emerald-600"></span>
+          <span id="syncBtnLabel">Sincronizar</span>
+        </button>
+
+        <button id="excelBtn" onclick="openExcelModal()" class="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-zinc-50 text-zinc-800 text-sm font-medium rounded-lg border border-zinc-200 shadow-2xs transition cursor-pointer">
+          <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+          </svg>
+          <span id="excelBtnText">Importar / Exportar Excel</span>
+        </button>
+
+        <button onclick="openTaskModal()" class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0f6259] hover:bg-[#0b4f48] text-white text-sm font-medium rounded-lg shadow-2xs transition cursor-pointer">
+          <span class="text-base leading-none">+</span>
+          <span id="newTaskBtnText">Nova tarefa</span>
+          <kbd class="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-white/15 rounded text-white/90">N</kbd>
+        </button>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 bg-white rounded-xl border border-zinc-200/90 shadow-2xs mb-6 divide-y lg:divide-y-0 lg:divide-x divide-zinc-200/80 overflow-hidden">
+      <div onclick="setStatusFilter('Abiertas')" class="p-4 sm:px-5 sm:py-4 hover:bg-zinc-50/70 transition cursor-pointer">
+        <div id="kpiAbiertas" class="text-[26px] font-semibold text-zinc-900 leading-none mb-1.5">0</div>
+        <div id="kpiLabelOpen" class="text-xs text-zinc-500">Abertas</div>
+      </div>
+
+      <div onclick="filterByHighPriority()" class="p-4 sm:px-5 sm:py-4 hover:bg-zinc-50/70 transition cursor-pointer">
+        <div id="kpiAlta" class="text-[26px] font-semibold text-zinc-900 leading-none mb-1.5">0</div>
+        <div id="kpiLabelHigh" class="text-xs text-zinc-500">Prioridade alta</div>
+      </div>
+
+      <div onclick="filterByOverdue()" class="p-4 sm:px-5 sm:py-4 hover:bg-zinc-50/70 transition cursor-pointer">
+        <div id="kpiVencidas" class="text-[26px] font-semibold text-red-700 leading-none mb-1.5">0</div>
+        <div id="kpiLabelOverdue" class="text-xs text-zinc-500">Vencidas</div>
+      </div>
+
+      <div onclick="filterByDelegated()" class="p-4 sm:px-5 sm:py-4 hover:bg-amber-50/70 transition cursor-pointer">
+        <div id="kpiDerivar" class="text-[26px] font-semibold text-amber-600 leading-none mb-1.5">0</div>
+        <div id="kpiLabelDelegate" class="text-xs text-zinc-500">Por derivar</div>
+      </div>
+    </div>
+
+    <!-- Filter Bar Row 1 -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
+      <div id="statusPills" class="flex flex-wrap items-center gap-1.5"></div>
+
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="relative flex-1 sm:flex-initial">
+          <input
+            id="searchInput"
+            type="text"
+            oninput="render()"
+            placeholder="Buscar tarefa, localización, empresa..."
+            class="w-full sm:w-64 pl-3 pr-8 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-[#0f6259]"
+          />
+          <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 text-xs cursor-pointer">✕</button>
+        </div>
+
+        <select id="priorityFilter" onchange="render()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 focus:outline-none focus:border-[#0f6259] cursor-pointer">
+          <option value="ALL">Toda prioridade</option>
+          <option value="Alta">Prioridade Alta</option>
+          <option value="Media">Prioridade Media</option>
+          <option value="Baja">Prioridade Baixa</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Filter Bar Row 2 -->
+    <div class="flex flex-wrap items-center justify-between gap-2.5 mb-4">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <select id="assigneeFilter" onchange="render()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 focus:outline-none focus:border-[#0f6259] cursor-pointer">
+          <option value="ALL">Todos os responsables</option>
+        </select>
+
+        <select id="sortModeSelect" onchange="handleSortModeChange()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 focus:outline-none focus:border-[#0f6259] cursor-pointer">
+          <option value="manual">Orde: manual (arrastrar)</option>
+          <option value="group_priority">Agrupar por prioridade (Alta › Media › Baixa)</option>
+          <option value="deadline_asc">Orde: data límite máis próxima</option>
+        </select>
+
+        <button id="onlyDelegatedBtn" onclick="toggleOnlyDelegated()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition cursor-pointer">
+          Só por derivar
+        </button>
+
+        <button id="onlyOverdueBtn" onclick="toggleOnlyOverdue()" class="px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition cursor-pointer">
+          Só vencidas
+        </button>
+
+        <button id="resetFiltersBtn" onclick="resetFilters()" class="hidden px-2.5 py-1.5 text-xs font-medium text-[#0f6259] hover:underline cursor-pointer">
+          Limpar filtros
+        </button>
+      </div>
+
+      <div id="dragHint" class="text-xs text-zinc-400 hidden sm:flex items-center gap-1.5">
+        <span>Arrastra <strong class="text-zinc-600">≡</strong> para reordenar prioridades individualmente</span>
+      </div>
+    </div>
+
+    <!-- Main Task Table -->
+    <div class="bg-white rounded-xl border border-zinc-200/90 shadow-2xs overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-zinc-200/90 bg-zinc-50/40 text-[11px] font-medium text-zinc-500 mono-label uppercase">
+              <th class="py-3 pl-3 pr-1 w-16"></th>
+              <th id="thTask" class="py-3 px-3 min-w-[260px]">TAREFA E LOCALIZACIÓN</th>
+              <th id="thPriority" class="py-3 px-3 w-32">PRIORIDADE</th>
+              <th id="thStatus" class="py-3 px-3 w-36">ESTADO</th>
+              <th id="thAssignee" class="py-3 px-3 w-32">RESPONSABLE</th>
+              <th id="thDeadline" class="py-3 px-3 w-32">DATA LÍMITE</th>
+              <th id="thDelegate" class="py-3 px-3 w-48">DERIVAR / EMPRESA</th>
+              <th id="thActions" class="py-3 pl-2 pr-4 w-20 text-right">ACCIÓNS</th>
+            </tr>
+          </thead>
+          <tbody id="taskTableBody" class="divide-y divide-zinc-200/75 text-sm"></tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden py-14 px-4 text-center">
+        <p id="emptyTitle" class="text-zinc-600 font-medium mb-1">Non hai tarefas que coincidan con estes filtros</p>
+        <p id="emptySub" class="text-xs text-zinc-400 mb-4">Proba a cambiar os filtros ou engade unha nova tarefa arriba.</p>
+        <button id="emptyResetBtn" onclick="resetFilters()" class="px-3.5 py-1.5 bg-zinc-900 text-white text-xs font-medium rounded-lg hover:bg-zinc-800 cursor-pointer">
+          Mostrar todas as tarefas
+        </button>
+      </div>
+    </div>
+
+    <!-- Footer Note -->
+    <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-zinc-400 px-1">
+      <span id="footerNote">Os cambios gárdanse automaticamente neste navegador. Podes conectar unha Folla de Cálculo de Google para sincronizar avarias.</span>
+      <button id="restoreDemoBtn" onclick="restoreDemoData()" class="text-left sm:text-right hover:text-zinc-600 underline cursor-pointer">
+        Restaurar datos de exemplo
+      </button>
+    </div>
+  </div>
+
+  <!-- Datalists -->
+  <datalist id="assigneesDatalist">
+    <option value="Matías"></option>
+    <option value="Conserxería"></option>
+    <option value="Mantemento"></option>
+    <option value="Dirección"></option>
+  </datalist>
+
+  <datalist id="companiesDatalist">
+    <option value="Electricista"></option>
+    <option value="Fontanería"></option>
+    <option value="Carpintería"></option>
+    <option value="Xardinería"></option>
+    <option value="Cerraxería"></option>
+    <option value="Climatización / Caldeira"></option>
+    <option value="Persianas / Toldos"></option>
+    <option value="Limpeza"></option>
+    <option value="Informática"></option>
+    <option value="Concello"></option>
+  </datalist>
+
+  <!-- MODAL: Nova / Editar Tarefa -->
+  <div id="taskModal" class="hidden fixed inset-0 z-50 bg-zinc-900/45 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-xl w-full max-w-lg overflow-hidden max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+        <h2 id="taskModalTitle" class="text-lg font-bold text-zinc-900">Nova tarefa</h2>
+        <button type="button" onclick="closeTaskModal()" class="text-zinc-400 hover:text-zinc-600 text-lg leading-none cursor-pointer">✕</button>
+      </div>
+
+      <form id="taskForm" onsubmit="saveTaskFromModal(event)" class="p-6 space-y-4 overflow-y-auto">
+        <input type="hidden" id="editTaskId" />
+
+        <div>
+          <label id="lblFieldTitle" class="block text-xs font-semibold text-zinc-700 mb-1">Título da tarefa *</label>
+          <input id="fieldTitle" type="text" required oninput="checkDuplicateWarning()" placeholder="Ex. Caeu un estor en 4º ESO A" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+        </div>
+
+        <div id="duplicateWarningBox" class="hidden p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950">
+          <div class="flex items-start gap-2.5">
+            <span class="text-amber-600 text-base leading-none mt-0.5">⚠️</span>
+            <div class="flex-1 min-w-0">
+              <div id="duplicateWarningTitle" class="text-xs font-bold text-amber-900">
+                Parece que esa avaría xa existe na lista:
+              </div>
+              <ul id="duplicateMatchesList" class="mt-1.5 space-y-1 text-xs text-amber-800"></ul>
+              <div id="duplicateWarningHint" class="mt-2 text-[11px] text-amber-700">
+                Comproba se é a mesma antes de gardala para non duplicar traballos.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label id="lblFieldLocation" class="block text-xs font-semibold text-zinc-700 mb-1">Localización / Aula / Zona</label>
+            <input id="fieldLocation" type="text" oninput="checkDuplicateWarning()" placeholder="Ex. 4º ESO A / Patio" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+          </div>
+          <div>
+            <label id="lblFieldNote" class="block text-xs font-semibold text-zinc-700 mb-1">Nota de pedido / Subtexto</label>
+            <input id="fieldNote" type="text" placeholder="Ex. Pedida 18 sept / Urxente" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <div>
+            <label id="lblFieldPriority" class="block text-xs font-semibold text-zinc-700 mb-1">Prioridade</label>
+            <select id="fieldPriority" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm bg-white focus:outline-none focus:border-[#0f6259]">
+              <option value="Alta">Alta</option>
+              <option value="Media">Media</option>
+              <option value="Baja">Baixa</option>
+            </select>
+          </div>
+
+          <div>
+            <label id="lblFieldStatus" class="block text-xs font-semibold text-zinc-700 mb-1">Estado</label>
+            <select id="fieldStatus" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm bg-white focus:outline-none focus:border-[#0f6259]">
+              <option value="Pendiente">Pendente</option>
+              <option value="En curso">En curso</option>
+              <option value="Bloqueada">Bloqueada</option>
+              <option value="Hecha">Feita</option>
+            </select>
+          </div>
+
+          <div>
+            <label id="lblFieldAssignee" class="block text-xs font-semibold text-zinc-700 mb-1">Responsable</label>
+            <input id="fieldAssignee" type="text" list="assigneesDatalist" value="Matías" placeholder="Matías" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-start pt-1">
+          <div>
+            <label id="lblFieldDeadline" class="block text-xs font-semibold text-zinc-700 mb-1">Data límite</label>
+            <input id="fieldDeadline" type="date" class="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:border-[#0f6259]" />
+          </div>
+
+          <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input id="fieldDerivar" type="checkbox" onchange="toggleModalDerivarInput()" class="w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500" />
+              <span id="lblFieldDerivar" class="text-xs font-semibold text-zinc-800">Derivar a outro / empresa</span>
+            </label>
+            <div id="modalDerivarCompanyWrap" class="hidden mt-2">
+              <input
+                id="fieldDerivarTo"
+                type="text"
+                list="companiesDatalist"
+                placeholder="Nome ou empresa (ex. Electricista)"
+                class="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-zinc-100">
+          <button id="btnModalCancel" type="button" onclick="closeTaskModal()" class="px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 rounded-lg cursor-pointer">
+            Cancelar
+          </button>
+          <button id="saveAndNewBtn" type="button" onclick="saveTaskAndKeepOpen()" class="px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-sm font-medium rounded-lg cursor-pointer">
+            Gardar e engadir outra
+          </button>
+          <button id="btnModalSave" type="submit" class="px-4 py-2 bg-[#0f6259] hover:bg-[#0b4f48] text-white text-sm font-medium rounded-lg cursor-pointer">
+            Gardar tarefa
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Importar / Exportar Excel & Google Sheets -->
+  <div id="excelModal" class="hidden fixed inset-0 z-50 bg-zinc-900/45 backdrop-blur-[1px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-zinc-200 shadow-xl w-full max-w-xl overflow-hidden max-h-[92vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
+        <h2 id="excelModalTitle" class="text-lg font-bold text-zinc-900">Excel e Google Follas de Cálculo</h2>
+        <button type="button" onclick="closeExcelModal()" class="text-zinc-400 hover:text-zinc-600 text-lg leading-none cursor-pointer">✕</button>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto">
+        <!-- Section 0: Google Sheets Live Sync -->
+        <div class="p-4 rounded-xl bg-emerald-50/60 border border-emerald-200">
+          <div class="flex items-center justify-between mb-1">
+            <h3 id="gsSectionTitle" class="text-sm font-semibold text-emerald-950">1. Sincronización automática con Google Follas de Cálculo</h3>
+            <span class="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 rounded-full">Google Sheets</span>
+          </div>
+          <p id="gsSectionDesc" class="text-xs text-emerald-900/80 mb-3 leading-relaxed">
+            Pega a ligazón da túa folla de Google (compartida como <strong>"Calquera persoa coa ligazón"</strong>). Soporta directamente o voso formato (<span class="font-mono">✓ | Data de solicitude | Ubicacion/Planta | Prioridad | Tarea | OBSERVACIONES</span>) e actualiza ao momento tanto as novas como as marcadas como feitas.
+          </p>
+
+          <div class="flex flex-col sm:flex-row gap-2 mb-2.5">
+            <input
+              id="googleSheetUrlInput"
+              type="url"
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              class="flex-1 px-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-[#0f6259]"
+            />
+            <button id="gsConnectBtn" type="button" onclick="saveGoogleSheetConnection()" class="px-3.5 py-2 bg-[#0f6259] hover:bg-[#0b4f48] text-white text-xs font-semibold rounded-lg shrink-0 cursor-pointer">
+              Conectar e importar
+            </button>
+          </div>
+
+          <div id="gsStatusRow" class="hidden flex flex-wrap items-center justify-between gap-2 text-[11px] text-emerald-800 pt-1">
+            <span id="gsLastSyncText">Conectado</span>
+            <div class="flex items-center gap-3">
+              <button id="gsReimportBtn" type="button" onclick="syncFromGoogleSheet(true, true)" class="text-emerald-900 font-semibold hover:underline cursor-pointer">
+                Reimportar todas as filas da folla
+              </button>
+              <button id="gsDisconnectBtn" type="button" onclick="disconnectGoogleSheet()" class="text-red-700 hover:underline cursor-pointer">
+                Desconectar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1: Export -->
+        <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200/80">
+          <h3 id="excelExportTitle" class="text-sm font-semibold text-zinc-900 mb-1">2. Exportar listaxe actual a Excel (.xlsx)</h3>
+          <p id="excelExportDesc" class="text-xs text-zinc-500 mb-3">Descarga todas as túas tarefas actuais coa súa orde, prioridades, estados, datas límite e empresas derivadas.</p>
+          <div class="flex flex-wrap gap-2">
+            <button id="btnDownloadTasksExcel" type="button" onclick="exportToExcel(false)" class="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-medium rounded-lg cursor-pointer">
+              Descargar Excel coas miñas tarefas
+            </button>
+            <button id="btnDownloadTemplateExcel" type="button" onclick="exportToExcel(true)" class="px-3.5 py-2 bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 text-xs font-medium rounded-lg cursor-pointer">
+              Descargar modelo baleiro (.xlsx)
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 2: Import local file -->
+        <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200/80">
+          <h3 id="excelImportTitle" class="text-sm font-semibold text-zinc-900 mb-1">3. Importar arquivo Excel local (.xlsx, .xls, .csv)</h3>
+          <p id="excelImportDesc" class="text-xs text-zinc-500 mb-3">
+            Recoñece tamén a estrutura da folla do colexio (<span class="font-mono text-zinc-700">✓, Data de solicitude, Ubicacion/Planta, Prioridad, Tarea, OBSERVACIONES</span>) ou o modelo estándar.
+          </p>
+
+          <div class="flex items-center gap-4 mb-3 text-xs text-zinc-700">
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="importMode" value="append" checked class="text-[#0f6259]" />
+              <span id="lblImportAppend">Engadir ás actuais</span>
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="importMode" value="replace" class="text-[#0f6259]" />
+              <span id="lblImportReplace">Substituír lista completa</span>
+            </label>
+          </div>
+
+          <input id="excelFileInput" type="file" accept=".xlsx,.xls,.csv" onchange="handleExcelImport(event)" class="block w-full text-xs text-zinc-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-900 file:text-white hover:file:bg-zinc-800 file:cursor-pointer" />
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-zinc-50 border-t border-zinc-100 flex justify-end shrink-0">
+        <button id="btnExcelClose" type="button" onclick="closeExcelModal()" class="px-4 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-200/70 rounded-lg cursor-pointer">
+          Pechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 hidden bg-zinc-900 text-white text-xs font-medium px-4 py-2.5 rounded-lg shadow-lg"></div>
+
+  <script>
+    const STORAGE_KEY = 'mis_trabajos_andaina_v5';
+    const LANG_KEY = 'mis_trabajos_lang_v5';
+    const GSHEET_KEY = 'mis_trabajos_gsheet_url_v5';
+
+    const I18N = {
+      gl: {
+        appTitle: 'Os meus traballos',
+        completedOf: '{done}/{total} completadas',
+        excelBtn: 'Importar / Exportar Excel',
+        newTaskBtn: 'Nova tarefa',
+        syncBtn: 'Sincronizar',
+        syncingBtn: 'Sincronizando...',
+        kpiOpen: 'Abertas',
+        kpiHigh: 'Prioridade alta',
+        kpiOverdue: 'Vencidas',
+        kpiDelegate: 'Por derivar',
+        statusOpen: 'Abertas',
+        statusPending: 'Pendente',
+        statusInProgress: 'En curso',
+        statusBlocked: 'Bloqueada',
+        statusDone: 'Feitas',
+        statusDoneSingle: 'Feita',
+        searchPlaceholder: 'Buscar tarefa, localización, empresa...',
+        allPriorities: 'Toda prioridade',
+        prioHighOpt: 'Prioridade Alta',
+        prioMedOpt: 'Prioridade Media',
+        prioLowOpt: 'Prioridade Baixa',
+        prioHigh: 'Alta',
+        prioMed: 'Media',
+        prioLow: 'Baixa',
+        allAssignees: 'Todos os responsables',
+        sortManual: 'Orde: manual (arrastrar)',
+        sortGroupPrio: 'Agrupar por prioridade (Alta › Media › Baixa)',
+        sortDeadline: 'Orde: data límite máis próxima',
+        onlyDelegated: 'Só por derivar',
+        onlyOverdue: 'Só vencidas',
+        resetFilters: 'Limpar filtros',
+        dragHint: 'Arrastra <strong class="text-zinc-600">≡</strong> para reordenar prioridades individualmente',
+        thTask: 'TAREFA E LOCALIZACIÓN',
+        thPriority: 'PRIORIDADE',
+        thStatus: 'ESTADO',
+        thAssignee: 'RESPONSABLE',
+        thDeadline: 'DATA LÍMITE',
+        thDelegate: 'DERIVAR / EMPRESA',
+        thActions: 'ACCIÓNS',
+        noDate: 'Sen data',
+        overdueTag: 'Vencida',
+        todayTag: 'Hoxe',
+        delegatedBadge: 'Derivada',
+        delegatePlaceholder: 'Nome / empresa...',
+        delegatePrompt: 'Derivar...',
+        groupPriorityTitle: 'Prioridade {prio}',
+        groupTaskSingular: 'tarefa',
+        groupTaskPlural: 'tarefas',
+        groupDragHint: 'Arrastra tarefas aquí ou reordena dentro do bloque',
+        groupEmpty: 'Sen tarefas en prioridade {prio} (arrastra unha tarefa aquí para cambiar a súa prioridade)',
+        emptyTitle: 'Non hai tarefas que coincidan con estes filtros',
+        emptySub: 'Proba a cambiar os filtros ou engade unha nova tarefa arriba.',
+        emptyResetBtn: 'Mostrar todas as tarefas',
+        footerNote: 'Os cambios gárdanse automaticamente neste navegador. Conectado co formato da folla de tarefas do colexio.',
+        restoreDemo: 'Restaurar datos de exemplo',
+        modalNewTitle: 'Nova tarefa',
+        modalEditTitle: 'Editar tarefa',
+        lblTitle: 'Título da tarefa *',
+        phTitle: 'Ex. Caeu un estor en 4º ESO A',
+        lblLocation: 'Localización / Aula / Zona',
+        phLocation: 'Ex. 4º ESO A / Patio',
+        lblNote: 'Nota de pedido / Subtexto',
+        phNote: 'Ex. Pedida 18/09 · Urxente',
+        lblPriority: 'Prioridade',
+        lblStatus: 'Estado',
+        lblAssignee: 'Responsable',
+        lblDeadline: 'Data límite',
+        lblDerivar: 'Derivar a outro / empresa',
+        phDerivarTo: 'Nome ou empresa (ex. Electricista)',
+        btnCancel: 'Cancelar',
+        btnSaveAndNew: 'Gardar e engadir outra',
+        btnSave: 'Gardar tarefa',
+        dupWarnTitle: 'Parece que esa avaría xa existe na lista:',
+        dupWarnHint: 'Comproba se é a mesma antes de gardala para non duplicar traballos.',
+        excelModalTitle: 'Excel e Google Follas de Cálculo',
+        gsSectionTitle: '1. Sincronización automática con Google Follas de Cálculo',
+        gsSectionDesc: 'Pega a ligazón da túa folla de Google (compartida como <strong>"Calquera persoa coa ligazón"</strong>). Soporta directamente o voso formato (<span class="font-mono">✓ | Data de solicitude | Ubicacion/Planta | Prioridad | Tarea | OBSERVACIONES</span>) e actualiza ao momento tanto as novas como as marcadas como feitas.',
+        gsConnectBtn: 'Conectar e importar',
+        gsReimportBtn: 'Reimportar todas as filas da folla',
+        gsDisconnectBtn: 'Desconectar',
+        gsConnectedAt: 'Última sincronización: {time}',
+        gsInvalidUrl: 'Introduce unha ligazón válida de Google Sheets',
+        gsSyncOk: 'Sincronizado: {added} novas, {updated} actualizadas ({total} filas lidas)',
+        gsSyncNoNew: 'Folla ao día ({total} filas comprobadas, sen cambios novos)',
+        gsSyncError: 'Non se puido ler a folla. Asegúrate de compartila como "Calquera persoa coa ligazón".',
+        excelExportTitle: '2. Exportar listaxe actual a Excel (.xlsx)',
+        excelExportDesc: 'Descarga todas as túas tarefas actuais coa súa orde, prioridades, estados, datas límite e empresas derivadas.',
+        btnDownloadTasks: 'Descargar Excel coas miñas tarefas',
+        btnDownloadTemplate: 'Descargar modelo baleiro (.xlsx)',
+        excelImportTitle: '3. Importar arquivo Excel local (.xlsx, .xls, .csv)',
+        excelImportDesc: 'Recoñece tamén a estrutura da folla do colexio (<span class="font-mono text-zinc-700">✓, Data de solicitude, Ubicacion/Planta, Prioridad, Tarea, OBSERVACIONES</span>) ou o modelo estándar.',
+        lblImportAppend: 'Engadir ás actuais',
+        lblImportReplace: 'Substituír lista completa',
+        btnClose: 'Pechar',
+        toastUpdated: 'Tarefa actualizada',
+        toastCreated: 'Tarefa creada',
+        toastDeleted: 'Tarefa eliminada',
+        toastDelegated: 'Tarefa derivada (marcada en amarelo). Escribe o nome ou empresa.',
+        toastPrioChanged: 'Prioridade cambiada a {prio}',
+        toastExcelDown: 'Arquivo Excel descargado',
+        toastImported: '{n} tarefas importadas desde Excel',
+        toastEmptyFile: 'O arquivo está baleiro',
+        toastNoTaskCol: 'Non se atoparon filas coa columna "Tarea"',
+        toastReadError: 'Erro ao ler o arquivo Excel',
+        toastRestored: 'Datos de exemplo restaurados',
+        days: ['DOMINGO', 'LUNS', 'MARTES', 'MÉRCORES', 'XOVES', 'VENRES', 'SÁBADO'],
+        months: ['XANEIRO', 'FEBREIRO', 'MARZO', 'ABRIL', 'MAIO', 'XUÑO', 'XULLO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DECEMBRO'],
+        monthsShort: ['xan', 'feb', 'mar', 'abr', 'mai', 'xuñ', 'xul', 'ago', 'set', 'out', 'nov', 'dec']
+      },
+      es: {
+        appTitle: 'Mis trabajos',
+        completedOf: '{done}/{total} completadas',
+        excelBtn: 'Importar / Exportar Excel',
+        newTaskBtn: 'Nueva tarea',
+        syncBtn: 'Sincronizar',
+        syncingBtn: 'Sincronizando...',
+        kpiOpen: 'Abiertas',
+        kpiHigh: 'Prioridad alta',
+        kpiOverdue: 'Vencidas',
+        kpiDelegate: 'Por derivar',
+        statusOpen: 'Abiertas',
+        statusPending: 'Pendiente',
+        statusInProgress: 'En curso',
+        statusBlocked: 'Bloqueada',
+        statusDone: 'Hechas',
+        statusDoneSingle: 'Hecha',
+        searchPlaceholder: 'Buscar tarea, ubicación, empresa...',
+        allPriorities: 'Toda prioridad',
+        prioHighOpt: 'Prioridad Alta',
+        prioMedOpt: 'Prioridad Media',
+        prioLowOpt: 'Prioridad Baja',
+        prioHigh: 'Alta',
+        prioMed: 'Media',
+        prioLow: 'Baja',
+        allAssignees: 'Todos los responsables',
+        sortManual: 'Orden: manual (arrastrar)',
+        sortGroupPrio: 'Agrupar por prioridad (Alta › Media › Baja)',
+        sortDeadline: 'Orden: fecha límite más próxima',
+        onlyDelegated: 'Solo por derivar',
+        onlyOverdue: 'Solo vencidas',
+        resetFilters: 'Limpiar filtros',
+        dragHint: 'Arrastra <strong class="text-zinc-600">≡</strong> para reordenar prioridades individualmente',
+        thTask: 'TAREA Y UBICACIÓN',
+        thPriority: 'PRIORIDAD',
+        thStatus: 'ESTADO',
+        thAssignee: 'RESPONSABLE',
+        thDeadline: 'FECHA LÍMITE',
+        thDelegate: 'DERIVAR / EMPRESA',
+        thActions: 'ACCIONES',
+        noDate: 'Sin fecha',
+        overdueTag: 'Vencida',
+        todayTag: 'Hoy',
+        delegatedBadge: 'Derivada',
+        delegatePlaceholder: 'Nombre / empresa...',
+        delegatePrompt: 'Derivar...',
+        groupPriorityTitle: 'Prioridad {prio}',
+        groupTaskSingular: 'tarea',
+        groupTaskPlural: 'tareas',
+        groupDragHint: 'Arrastra tareas aquí o reordena dentro del bloque',
+        groupEmpty: 'Sin tareas en prioridad {prio} (arrastra una tarea aquí para cambiar su prioridad)',
+        emptyTitle: 'No hay tareas que coincidan con estos filtros',
+        emptySub: 'Prueba a cambiar los filtros o añade una nueva tarea arriba.',
+        emptyResetBtn: 'Mostrar todas las tareas',
+        footerNote: 'Los cambios se guardan automáticamente en este navegador. Conectado con el formato de la hoja de tareas del colegio.',
+        restoreDemo: 'Restaurar datos de ejemplo',
+        modalNewTitle: 'Nueva tarea',
+        modalEditTitle: 'Editar tarea',
+        lblTitle: 'Título de la tarea *',
+        phTitle: 'Ej. Cayó un estor en 4º ESO A',
+        lblLocation: 'Ubicación / Aula / Zona',
+        phLocation: 'Ej. 4º ESO A / Patio',
+        lblNote: 'Nota de pedido / Subtexto',
+        phNote: 'Ej. Pedida 18/09 · Urgente',
+        lblPriority: 'Prioridad',
+        lblStatus: 'Estado',
+        lblAssignee: 'Responsable',
+        lblDeadline: 'Fecha límite',
+        lblDerivar: 'Derivar a otro / empresa',
+        phDerivarTo: 'Nombre o empresa (ej. Electricista)',
+        btnCancel: 'Cancelar',
+        btnSaveAndNew: 'Guardar y añadir otra',
+        btnSave: 'Guardar tarea',
+        dupWarnTitle: 'Parece que esa avería ya existe en la lista:',
+        dupWarnHint: 'Comprueba si es la misma antes de guardarla para no duplicar trabajos.',
+        excelModalTitle: 'Excel y Google Hojas de Cálculo',
+        gsSectionTitle: '1. Sincronización automática con Google Hojas de Cálculo',
+        gsSectionDesc: 'Pega el enlace de tu hoja de Google (compartida como <strong>"Cualquier persona con el enlace"</strong>). Soporta directamente vuestro formato (<span class="font-mono">✓ | Data de solicitude | Ubicacion/Planta | Prioridad | Tarea | OBSERVACIONES</span>) y actualiza al momento tanto las nuevas como las marcadas como hechas.',
+        gsConnectBtn: 'Conectar e importar',
+        gsReimportBtn: 'Reimportar todas las filas de la hoja',
+        gsDisconnectBtn: 'Desconectar',
+        gsConnectedAt: 'Última sincronización: {time}',
+        gsInvalidUrl: 'Introduce un enlace válido de Google Sheets',
+        gsSyncOk: 'Sincronizado: {added} nuevas, {updated} actualizadas ({total} filas leídas)',
+        gsSyncNoNew: 'Hoja al día ({total} filas comprobadas, sin cambios nuevos)',
+        gsSyncError: 'No se pudo leer la hoja. Asegúrate de compartirla como "Cualquier persona con el enlace".',
+        excelExportTitle: '2. Exportar listado actual a Excel (.xlsx)',
+        excelExportDesc: 'Descarga todas tus tareas actuales con su orden, prioridades, estados, fechas límite y empresas derivadas.',
+        btnDownloadTasks: 'Descargar Excel con mis tareas',
+        btnDownloadTemplate: 'Descargar plantilla vacía (.xlsx)',
+        excelImportTitle: '3. Importar archivo Excel local (.xlsx, .xls, .csv)',
+        excelImportDesc: 'Reconoce también la estructura de la hoja del colegio (<span class="font-mono text-zinc-700">✓, Data de solicitude, Ubicacion/Planta, Prioridad, Tarea, OBSERVACIONES</span>) o el modelo estándar.',
+        lblImportAppend: 'Añadir a las actuales',
+        lblImportReplace: 'Reemplazar lista completa',
+        btnClose: 'Cerrar',
+        toastUpdated: 'Tarea actualizada',
+        toastCreated: 'Tarea creada',
+        toastDeleted: 'Tarea eliminada',
+        toastDelegated: 'Tarea derivada (marcada en amarillo). Escribe el nombre o empresa.',
+        toastPrioChanged: 'Prioridad cambiada a {prio}',
+        toastExcelDown: 'Archivo Excel descargado',
+        toastImported: '{n} tareas importadas desde Excel',
+        toastEmptyFile: 'El archivo está vacío',
+        toastNoTaskCol: 'No se encontraron filas con columna "Tarea"',
+        toastReadError: 'Error al leer el archivo Excel',
+        toastRestored: 'Datos de ejemplo restaurados',
+        days: ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'],
+        months: ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'],
+        monthsShort: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic']
+      }
+    };
+
+    const DEFAULT_TASKS = [
+      {
+        id: 't-1',
+        title: 'Pintar os módulos do xardín- xogo de auga.',
+        location: 'xardín de infantil',
+        note: 'cando sexa posible, pero sen deixalo pasar.',
+        priority: 'Baja',
+        status: 'Pendiente',
+        assignee: 'Matías',
+        deadline: '',
+        derivar: false,
+        derivarTo: '',
+        order: 1
+      },
+      {
+        id: 't-2',
+        title: 'Cortar maleza que entra en la pista',
+        location: 'Pista de futbol',
+        note: 'Pedida 6 nov',
+        priority: 'Alta',
+        status: 'Pendiente',
+        assignee: 'Matías',
+        deadline: '',
+        derivar: false,
+        derivarTo: '',
+        order: 2
+      },
+      {
+        id: 't-3',
+        title: 'Barnizar os mobles da cociña da aula de 5º B.',
+        location: '5º EI B',
+        note: 'nunhas vacacións longas.',
+        priority: 'Baja',
+        status: 'Pendiente',
+        assignee: 'Matías',
+        deadline: '',
+        derivar: false,
+        derivarTo: '',
+        order: 3
+      },
+      {
+        id: 't-4',
+        title: 'Teriamos que soprar arredor dos dous areeiros todos os dias, para que a area quede dentro e non invada o cemento',
+        location: '',
+        note: 'Pedida 18/09',
+        priority: 'Alta',
+        status: 'Pendiente',
+        assignee: 'Matías',
+        deadline: '',
+        derivar: false,
+        derivarTo: '',
+        order: 4
+      },
+      {
+        id: 't-5',
+        title: 'Caeu un estor.',
+        location: '4ºESO A',
+        note: '',
+        priority: 'Alta',
+        status: 'Pendiente',
+        assignee: 'Matías',
+        deadline: '',
+        derivar: false,
+        derivarTo: '',
+        order: 5
+      },
+      {
+        id: 't-6',
+        title: 'Luces do medio no teito',
+        location: 'EI, aula Vero',
+        note: 'Pedida 21/09',
+        priority: 'Alta',
+        status: 'Pendiente',
+        assignee: 'Matías',
+        deadline: '',
+        derivar: false,
+        derivarTo: '',
+        order: 6
+      },
+      {
+        id: 't-7',
+        title: '- poñer os peches das portas dos armarios brancos',
+        location: 'Aula 3º B',
+        note: '',
+        priority: 'Media',
+        status: 'Pendiente',
+        assignee: 'Matías',
+        deadline: '',
+        derivar: false,
+        derivarTo: '',
+        order: 7
+      }
+    ];
+
+    let currentLang = 'gl';
+    let tasks = [];
+    let statusFilter = 'Abiertas';
+    let onlyDelegated = false;
+    let onlyOverdue = false;
+    let draggedTaskId = null;
+    let googleSheetUrl = '';
+    let autoSyncTimer = null;
+
+    function t(key, vars = {}) {
+      let str = (I18N[currentLang] && I18N[currentLang][key]) || I18N.gl[key] || key;
+      Object.entries(vars).forEach(([k, v]) => {
+        str = str.replaceAll(`{${k}}`, v);
+      });
+      return str;
+    }
+
+    function priorityLabel(val) {
+      if (val === 'Alta') return t('prioHigh');
+      if (val === 'Baja') return t('prioLow');
+      return t('prioMed');
+    }
+
+    function statusLabel(val) {
+      if (val === 'Pendiente') return t('statusPending');
+      if (val === 'En curso') return t('statusInProgress');
+      if (val === 'Bloqueada') return t('statusBlocked');
+      if (val === 'Hecha') return t('statusDoneSingle');
+      return val;
+    }
+
+    function init() {
+      const savedLang = localStorage.getItem(LANG_KEY);
+      if (savedLang === 'es' || savedLang === 'gl') {
+        currentLang = savedLang;
+      } else {
+        currentLang = 'gl';
+        localStorage.setItem(LANG_KEY, 'gl');
+      }
+
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          tasks = JSON.parse(saved);
+        } catch (e) {
+          tasks = structuredClone(DEFAULT_TASKS);
+        }
+      } else {
+        tasks = structuredClone(DEFAULT_TASKS);
+        saveTasks();
+      }
+
+      googleSheetUrl = localStorage.getItem(GSHEET_KEY) || '';
+      updateGoogleSheetUI();
+
+      applyStaticTranslations();
+      render();
+
+      if (googleSheetUrl) {
+        syncFromGoogleSheet(false, false);
+        startAutoSyncLoop();
+      }
+    }
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem(LANG_KEY, lang);
+      document.documentElement.lang = lang;
+      applyStaticTranslations();
+      render();
+    }
+
+    function applyStaticTranslations() {
+      document.getElementById('langGlBtn').className = currentLang === 'gl'
+        ? 'px-2.5 py-1.5 text-xs font-bold rounded-md bg-[#0f6259] text-white transition cursor-pointer'
+        : 'px-2.5 py-1.5 text-xs font-semibold rounded-md text-zinc-600 hover:bg-zinc-100 transition cursor-pointer';
+
+      document.getElementById('langEsBtn').className = currentLang === 'es'
+        ? 'px-2.5 py-1.5 text-xs font-bold rounded-md bg-[#0f6259] text-white transition cursor-pointer'
+        : 'px-2.5 py-1.5 text-xs font-semibold rounded-md text-zinc-600 hover:bg-zinc-100 transition cursor-pointer';
+
+      document.title = `${t('appTitle')} · Andaina`;
+      document.getElementById('appTitle').textContent = t('appTitle');
+      document.getElementById('excelBtnText').textContent = t('excelBtn');
+      document.getElementById('newTaskBtnText').textContent = t('newTaskBtn');
+      document.getElementById('syncBtnLabel').textContent = t('syncBtn');
+
+      document.getElementById('kpiLabelOpen').textContent = t('kpiOpen');
+      document.getElementById('kpiLabelHigh').textContent = t('kpiHigh');
+      document.getElementById('kpiLabelOverdue').textContent = t('kpiOverdue');
+      document.getElementById('kpiLabelDelegate').textContent = t('kpiDelegate');
+
+      document.getElementById('searchInput').placeholder = t('searchPlaceholder');
+
+      const prioFilter = document.getElementById('priorityFilter');
+      prioFilter.options[0].text = t('allPriorities');
+      prioFilter.options[1].text = t('prioHighOpt');
+      prioFilter.options[2].text = t('prioMedOpt');
+      prioFilter.options[3].text = t('prioLowOpt');
+
+      const sortSel = document.getElementById('sortModeSelect');
+      sortSel.options[0].text = t('sortManual');
+      sortSel.options[1].text = t('sortGroupPrio');
+      sortSel.options[2].text = t('sortDeadline');
+
+      document.getElementById('onlyDelegatedBtn').textContent = t('onlyDelegated');
+      document.getElementById('onlyOverdueBtn').textContent = t('onlyOverdue');
+      document.getElementById('resetFiltersBtn').textContent = t('resetFilters');
+      document.getElementById('dragHint').innerHTML = `<span>${t('dragHint')}</span>`;
+
+      document.getElementById('thTask').textContent = t('thTask');
+      document.getElementById('thPriority').textContent = t('thPriority');
+      document.getElementById('thStatus').textContent = t('thStatus');
+      document.getElementById('thAssignee').textContent = t('thAssignee');
+      document.getElementById('thDeadline').textContent = t('thDeadline');
+      document.getElementById('thDelegate').textContent = t('thDelegate');
+      document.getElementById('thActions').textContent = t('thActions');
+
+      document.getElementById('emptyTitle').textContent = t('emptyTitle');
+      document.getElementById('emptySub').textContent = t('emptySub');
+      document.getElementById('emptyResetBtn').textContent = t('emptyResetBtn');
+      document.getElementById('footerNote').textContent = t('footerNote');
+      document.getElementById('restoreDemoBtn').textContent = t('restoreDemo');
+
+      document.getElementById('lblFieldTitle').textContent = t('lblTitle');
+      document.getElementById('fieldTitle').placeholder = t('phTitle');
+      document.getElementById('lblFieldLocation').textContent = t('lblLocation');
+      document.getElementById('fieldLocation').placeholder = t('phLocation');
+      document.getElementById('lblFieldNote').textContent = t('lblNote');
+      document.getElementById('fieldNote').placeholder = t('phNote');
+      document.getElementById('lblFieldPriority').textContent = t('lblPriority');
+      document.getElementById('lblFieldStatus').textContent = t('lblStatus');
+      document.getElementById('lblFieldAssignee').textContent = t('lblAssignee');
+      document.getElementById('lblFieldDeadline').textContent = t('lblDeadline');
+      document.getElementById('lblFieldDerivar').textContent = t('lblDerivar');
+      document.getElementById('fieldDerivarTo').placeholder = t('phDerivarTo');
+      document.getElementById('btnModalCancel').textContent = t('btnCancel');
+      document.getElementById('saveAndNewBtn').textContent = t('btnSaveAndNew');
+      document.getElementById('btnModalSave').textContent = t('btnSave');
+      document.getElementById('duplicateWarningTitle').textContent = t('dupWarnTitle');
+      document.getElementById('duplicateWarningHint').textContent = t('dupWarnHint');
+
+      const fPrio = document.getElementById('fieldPriority');
+      fPrio.options[0].text = t('prioHigh');
+      fPrio.options[1].text = t('prioMed');
+      fPrio.options[2].text = t('prioLow');
+
+      const fStat = document.getElementById('fieldStatus');
+      fStat.options[0].text = t('statusPending');
+      fStat.options[1].text = t('statusInProgress');
+      fStat.options[2].text = t('statusBlocked');
+      fStat.options[3].text = t('statusDoneSingle');
+
+      document.getElementById('excelModalTitle').textContent = t('excelModalTitle');
+      document.getElementById('gsSectionTitle').textContent = t('gsSectionTitle');
+      document.getElementById('gsSectionDesc').innerHTML = t('gsSectionDesc');
+      document.getElementById('gsConnectBtn').textContent = t('gsConnectBtn');
+      document.getElementById('gsReimportBtn').textContent = t('gsReimportBtn');
+      document.getElementById('gsDisconnectBtn').textContent = t('gsDisconnectBtn');
+      document.getElementById('excelExportTitle').textContent = t('excelExportTitle');
+      document.getElementById('excelExportDesc').textContent = t('excelExportDesc');
+      document.getElementById('btnDownloadTasksExcel').textContent = t('btnDownloadTasks');
+      document.getElementById('btnDownloadTemplateExcel').textContent = t('btnDownloadTemplate');
+      document.getElementById('excelImportTitle').textContent = t('excelImportTitle');
+      document.getElementById('excelImportDesc').innerHTML = t('excelImportDesc');
+      document.getElementById('lblImportAppend').textContent = t('lblImportAppend');
+      document.getElementById('lblImportReplace').textContent = t('lblImportReplace');
+      document.getElementById('btnExcelClose').textContent = t('btnClose');
+
+      updateHeaderDate();
+    }
+
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    function updateHeaderDate() {
+      const now = new Date();
+      const dias = I18N[currentLang].days;
+      const meses = I18N[currentLang].months;
+      const str = `${dias[now.getDay()]}, ${now.getDate()} DE ${meses[now.getMonth()]}`;
+      document.getElementById('currentDateLabel').textContent = str;
+    }
+
+    function todayISO() {
+      const d = new Date();
+      const off = d.getTimezoneOffset();
+      const local = new Date(d.getTime() - off * 60 * 1000);
+      return local.toISOString().split('T')[0];
+    }
+
+    function isOverdue(task) {
+      if (!task.deadline || task.status === 'Hecha') return false;
+      return task.deadline < todayISO();
+    }
+
+    function isDueToday(task) {
+      if (!task.deadline || task.status === 'Hecha') return false;
+      return task.deadline === todayISO();
+    }
+
+    function formatDeadlineLabel(isoDate) {
+      if (!isoDate) return t('noDate');
+      const parts = isoDate.split('-');
+      if (parts.length !== 3) return isoDate;
+      const meses = I18N[currentLang].monthsShort;
+      const day = parseInt(parts[2], 10);
+      const month = meses[parseInt(parts[1], 10) - 1] || parts[1];
+      const currentYear = new Date().getFullYear().toString();
+      return parts[0] === currentYear ? `${day} ${month}` : `${day} ${month} ${parts[0]}`;
+    }
+
+    function render() {
+      updateKPIs();
+      updateStatusPills();
+      updateAssigneeDropdown();
+
+      const sortMode = document.getElementById('sortModeSelect').value;
+      const searchVal = document.getElementById('searchInput').value.trim().toLowerCase();
+      const prioFilter = document.getElementById('priorityFilter').value;
+      const assigneeFilter = document.getElementById('assigneeFilter').value;
+
+      document.getElementById('clearSearchBtn').classList.toggle('hidden', !searchVal);
+      document.getElementById('dragHint').classList.toggle('hidden', sortMode === 'deadline_asc');
+
+      const hasActiveFilters =
+        statusFilter !== 'Abiertas' ||
+        prioFilter !== 'ALL' ||
+        assigneeFilter !== 'ALL' ||
+        onlyDelegated ||
+        onlyOverdue ||
+        searchVal !== '';
+      document.getElementById('resetFiltersBtn').classList.toggle('hidden', !hasActiveFilters);
+
+      document.getElementById('onlyDelegatedBtn').className = onlyDelegated
+        ? 'px-3 py-1.5 bg-amber-500 text-white border border-amber-500 rounded-lg text-sm font-medium transition cursor-pointer'
+        : 'px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition cursor-pointer';
+
+      document.getElementById('onlyOverdueBtn').className = onlyOverdue
+        ? 'px-3 py-1.5 bg-red-700 text-white border border-red-700 rounded-lg text-sm font-medium transition cursor-pointer'
+        : 'px-3 py-1.5 bg-white border border-zinc-200 rounded-lg text-sm text-zinc-700 hover:bg-zinc-50 transition cursor-pointer';
+
+      let filtered = tasks.filter(tItem => {
+        if (statusFilter === 'Abiertas' && tItem.status === 'Hecha') return false;
+        if (statusFilter === 'Hechas' && tItem.status !== 'Hecha') return false;
+        if (['Pendiente', 'En curso', 'Bloqueada'].includes(statusFilter) && tItem.status !== statusFilter) return false;
+        if (prioFilter !== 'ALL' && tItem.priority !== prioFilter) return false;
+        if (assigneeFilter !== 'ALL' && (tItem.assignee || 'Matías') !== assigneeFilter) return false;
+        if (onlyDelegated && !tItem.derivar) return false;
+        if (onlyOverdue && !isOverdue(tItem)) return false;
+
+        if (searchVal) {
+          const hay = `${tItem.title} ${tItem.location || ''} ${tItem.note || ''} ${tItem.assignee || ''} ${tItem.derivarTo || ''}`.toLowerCase();
+          if (!hay.includes(searchVal)) return false;
+        }
+        return true;
+      });
+
+      const tbody = document.getElementById('taskTableBody');
+      const emptyState = document.getElementById('emptyState');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      if (sortMode === 'group_priority') {
+        const groups = ['Alta', 'Media', 'Baja'];
+        let html = '';
+        groups.forEach(prio => {
+          const groupTasks = filtered
+            .filter(item => item.priority === prio)
+            .sort((a, b) => a.order - b.order);
+
+          const badgeColors = {
+            Alta: 'bg-red-100 text-red-800 border-red-200',
+            Media: 'bg-amber-100 text-amber-800 border-amber-200',
+            Baja: 'bg-slate-200 text-slate-700 border-slate-300'
+          };
+
+          const pLabel = priorityLabel(prio);
+          const countWord = groupTasks.length === 1 ? t('groupTaskSingular') : t('groupTaskPlural');
+
+          html += `
+            <tr class="bg-zinc-100/90 border-y border-zinc-200/90"
+                ondragover="handleGroupDragOver(event)"
+                ondrop="handleGroupDrop(event, '${prio}')">
+              <td colspan="8" class="py-2 px-4">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badgeColors[prio]}">
+                      ${t('groupPriorityTitle', { prio: pLabel })}
+                    </span>
+                    <span class="text-xs text-zinc-500 font-medium">${groupTasks.length} ${countWord}</span>
+                  </div>
+                  <span class="text-[11px] text-zinc-400">${t('groupDragHint')}</span>
+                </div>
+              </td>
+            </tr>
+          `;
+
+          if (groupTasks.length === 0) {
+            html += `
+              <tr ondragover="handleGroupDragOver(event)" ondrop="handleGroupDrop(event, '${prio}')">
+                <td colspan="8" class="py-3 px-6 text-xs text-zinc-400 italic">
+                  ${t('groupEmpty', { prio: pLabel.toLowerCase() })}
+                </td>
+              </tr>
+            `;
+          } else {
+            groupTasks.forEach(item => {
+              html += renderTaskRow(item, true);
+            });
+          }
+        });
+        tbody.innerHTML = html;
+      } else if (sortMode === 'deadline_asc') {
+        filtered.sort((a, b) => {
+          if (!a.deadline && !b.deadline) return a.order - b.order;
+          if (!a.deadline) return 1;
+          if (!b.deadline) return -1;
+          return a.deadline.localeCompare(b.deadline) || a.order - b.order;
+        });
+        tbody.innerHTML = filtered.map(item => renderTaskRow(item, false)).join('');
+      } else {
+        filtered.sort((a, b) => a.order - b.order);
+        tbody.innerHTML = filtered.map(item => renderTaskRow(item, true)).join('');
+      }
+    }
+
+    function renderTaskRow(task, allowDrag) {
+      const done = task.status === 'Hecha';
+      const overdue = isOverdue(task);
+      const dueToday = isDueToday(task);
+      const isDelegated = !!task.derivar;
+
+      const prioStyles = {
+        Alta: 'bg-[#fae3e3] text-[#b91c1c] hover:bg-[#f6d0d0]',
+        Media: 'bg-[#fef0c7] text-[#b45309] hover:bg-[#fde6a2]',
+        Baja: 'bg-[#ebeef2] text-[#475569] hover:bg-[#dfe4eb]'
+      };
+
+      const statusStyles = {
+        'Pendiente': 'bg-[#ebeef2] text-[#334155]',
+        'En curso': 'bg-[#dbeafe] text-[#1d4ed8]',
+        'Bloqueada': 'bg-[#fee2e2] text-[#b91c1c]',
+        'Hecha': 'bg-[#dcfce7] text-[#15803d]'
+      };
+
+      const subParts = [];
+      if (task.location) subParts.push(escapeHtml(task.location));
+      if (task.note) subParts.push(escapeHtml(task.note));
+
+      let rowClass = 'group transition-colors ';
+      if (isDelegated && !done) {
+        rowClass += 'delegated-row';
+      } else if (done) {
+        rowClass += 'bg-zinc-50/70 opacity-70';
+      } else {
+        rowClass += 'hover:bg-zinc-50/80';
+      }
+
+      return `
+        <tr
+          data-id="${task.id}"
+          draggable="${allowDrag}"
+          ondragstart="handleDragStart(event, '${task.id}')"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDrop(event, '${task.id}')"
+          ondragend="handleDragEnd(event)"
+          class="${rowClass}"
+        >
+          <td class="py-3.5 pl-3 pr-1 align-top">
+            <div class="flex items-center gap-1.5 pt-0.5">
+              <div class="flex items-center">
+                <span class="${allowDrag ? 'cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-700' : 'text-zinc-200 cursor-not-allowed'} select-none px-0.5 text-base leading-none">
+                  ≡
+                </span>
+                ${allowDrag ? `
+                  <div class="flex flex-col sm:hidden ml-0.5">
+                    <button type="button" onclick="moveTaskStep('${task.id}', -1)" class="text-[9px] leading-none text-zinc-400 hover:text-zinc-800 px-0.5">▲</button>
+                    <button type="button" onclick="moveTaskStep('${task.id}', 1)" class="text-[9px] leading-none text-zinc-400 hover:text-zinc-800 px-0.5">▼</button>
+                  </div>
+                ` : ''}
+              </div>
+              <input
+                type="checkbox"
+                ${done ? 'checked' : ''}
+                onchange="toggleTaskDone('${task.id}')"
+                class="w-4 h-4 rounded border-zinc-300 text-[#0f6259] focus:ring-[#0f6259] cursor-pointer"
+              />
+            </div>
+          </td>
+
+          <td class="py-3.5 px-3 align-top">
+            <div onclick="openTaskModal('${task.id}')" class="cursor-pointer">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-semibold text-[14px] leading-snug ${done ? 'line-through text-zinc-400' : 'text-zinc-900'}">
+                  ${escapeHtml(task.title)}
+                </span>
+                ${isDelegated ? `
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-200/90 text-amber-950 border border-amber-300">
+                    ↗ ${t('delegatedBadge')}${task.derivarTo ? ': ' + escapeHtml(task.derivarTo) : ''}
+                  </span>
+                ` : ''}
+              </div>
+              ${subParts.length ? `
+                <div class="text-xs ${isDelegated && !done ? 'text-amber-950/75' : 'text-zinc-500'} mt-0.5 leading-relaxed">
+                  ${subParts.join(' &nbsp;·&nbsp; ')}
+                </div>
+              ` : ''}
+            </div>
+          </td>
+
+          <td class="py-3.5 px-3 align-top">
+            <button
+              type="button"
+              onclick="cyclePriority('${task.id}')"
+              class="inline-flex items-center justify-center min-w-[74px] px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${prioStyles[task.priority] || prioStyles.Media}"
+            >
+              ${priorityLabel(task.priority)}
+            </button>
+          </td>
+
+          <td class="py-3.5 px-3 align-top">
+            <select
+              onchange="updateTaskField('${task.id}', 'status', this.value)"
+              class="px-3 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-[#0f6259] cursor-pointer ${statusStyles[task.status] || statusStyles['Pendiente']}"
+            >
+              <option value="Pendiente" ${task.status === 'Pendiente' ? 'selected' : ''}>${t('statusPending')}</option>
+              <option value="En curso" ${task.status === 'En curso' ? 'selected' : ''}>${t('statusInProgress')}</option>
+              <option value="Bloqueada" ${task.status === 'Bloqueada' ? 'selected' : ''}>${t('statusBlocked')}</option>
+              <option value="Hecha" ${task.status === 'Hecha' ? 'selected' : ''}>${t('statusDoneSingle')}</option>
+            </select>
+          </td>
+
+          <td class="py-3.5 px-3 align-top">
+            <input
+              type="text"
+              list="assigneesDatalist"
+              value="${escapeHtml(task.assignee || 'Matías')}"
+              onchange="updateTaskField('${task.id}', 'assignee', this.value.trim() || 'Matías')"
+              class="w-24 bg-transparent hover:bg-black/5 focus:bg-white px-2 py-1 -ml-2 rounded text-xs font-medium text-zinc-800 border border-transparent focus:border-zinc-300 focus:outline-none"
+            />
+          </td>
+
+          <td class="py-3.5 px-3 align-top">
+            <div class="relative inline-flex items-center">
+              <span class="text-xs font-medium ${overdue ? 'text-red-700 font-semibold' : dueToday ? 'text-amber-800 font-semibold' : task.deadline ? 'text-zinc-800' : 'text-zinc-500'}">
+                ${formatDeadlineLabel(task.deadline)}${overdue ? ' (' + t('overdueTag') + ')' : dueToday ? ' (' + t('todayTag') + ')' : ''}
+              </span>
+              <input
+                type="date"
+                value="${task.deadline || ''}"
+                onchange="updateTaskField('${task.id}', 'deadline', this.value)"
+                class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+              />
+            </div>
+          </td>
+
+          <td class="py-3.5 px-3 align-top">
+            <div class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                ${isDelegated ? 'checked' : ''}
+                onchange="toggleDerivar('${task.id}', this.checked)"
+                class="w-4 h-4 rounded border-zinc-400 text-amber-600 focus:ring-amber-500 cursor-pointer shrink-0"
+              />
+              ${isDelegated ? `
+                <input
+                  type="text"
+                  list="companiesDatalist"
+                  value="${escapeHtml(task.derivarTo || '')}"
+                  placeholder="${t('delegatePlaceholder')}"
+                  onchange="updateTaskField('${task.id}', 'derivarTo', this.value.trim())"
+                  class="w-36 px-2 py-1 text-xs font-medium bg-white/95 border border-amber-300 rounded-md text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-amber-600"
+                />
+              ` : `
+                <button type="button" onclick="toggleDerivar('${task.id}', true)" class="text-xs text-zinc-400 hover:text-zinc-700 cursor-pointer">
+                  ${t('delegatePrompt')}
+                </button>
+              `}
+            </div>
+          </td>
+
+          <td class="py-3.5 pl-2 pr-4 align-top text-right">
+            <div class="inline-flex items-center gap-1 opacity-75 group-hover:opacity-100 transition">
+              <button type="button" onclick="openTaskModal('${task.id}')" class="p-1 text-zinc-600 hover:text-zinc-900 rounded cursor-pointer">
+                ✎
+              </button>
+              <button type="button" onclick="deleteTask('${task.id}')" class="p-1 text-zinc-500 hover:text-red-600 rounded cursor-pointer">
+                🗑
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function updateKPIs() {
+      const total = tasks.length;
+      const done = tasks.filter(item => item.status === 'Hecha').length;
+      const openTasks = tasks.filter(item => item.status !== 'Hecha');
+      const highPrio = openTasks.filter(item => item.priority === 'Alta').length;
+      const overdue = openTasks.filter(item => isOverdue(item)).length;
+      const toDelegate = openTasks.filter(item => item.derivar).length;
+
+      document.getElementById('kpiAbiertas').textContent = openTasks.length;
+      document.getElementById('kpiAlta').textContent = highPrio;
+      document.getElementById('kpiVencidas').textContent = overdue;
+      document.getElementById('kpiDerivar').textContent = toDelegate;
+
+      document.getElementById('progressText').textContent = t('completedOf', { done, total });
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+    }
+
+    function updateStatusPills() {
+      const items = [
+        { key: 'Abiertas', label: t('statusOpen'), count: tasks.filter(item => item.status !== 'Hecha').length },
+        { key: 'Pendiente', label: t('statusPending'), count: tasks.filter(item => item.status === 'Pendiente').length },
+        { key: 'En curso', label: t('statusInProgress'), count: tasks.filter(item => item.status === 'En curso').length },
+        { key: 'Bloqueada', label: t('statusBlocked'), count: tasks.filter(item => item.status === 'Bloqueada').length },
+        { key: 'Hechas', label: t('statusDone'), count: tasks.filter(item => item.status === 'Hecha').length }
+      ];
+
+      const container = document.getElementById('statusPills');
+      container.innerHTML = items.map(pill => {
+        const active = statusFilter === pill.key;
+        return `
+          <button
+            type="button"
+            onclick="setStatusFilter('${pill.key}')"
+            class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+              active
+                ? 'bg-[#18181b] text-white shadow-2xs'
+                : 'bg-transparent text-zinc-600 hover:bg-zinc-200/60'
+            }"
+          >
+            ${pill.label} <span class="ml-1 ${active ? 'text-zinc-300' : 'text-zinc-400'}">${pill.count}</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function updateAssigneeDropdown() {
+      const select = document.getElementById('assigneeFilter');
+      const current = select.value;
+      const unique = Array.from(new Set(tasks.map(item => item.assignee || 'Matías'))).sort();
+
+      select.innerHTML = `<option value="ALL">${t('allAssignees')}</option>` +
+        unique.map(name => `<option value="${escapeHtml(name)}" ${name === current ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('');
+    }
+
+    function normalizeText(str) {
+      return String(str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9ºª\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function extractTokens(str) {
+      const stopWords = new Set(['el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'de', 'del', 'do', 'da', 'dos', 'das', 'en', 'no', 'na', 'nos', 'nas', 'o', 'a', 'os', 'as', 'y', 'e', 'que', 'por', 'para', 'con', 'se', 'al', 'ao']);
+      return normalizeText(str)
+        .split(' ')
+        .filter(w => w.length >= 2 && !stopWords.has(w));
+    }
+
+    function checkDuplicateWarning() {
+      const editId = document.getElementById('editTaskId').value;
+      const titleInput = document.getElementById('fieldTitle').value;
+      const locInput = document.getElementById('fieldLocation').value;
+      const box = document.getElementById('duplicateWarningBox');
+      const listEl = document.getElementById('duplicateMatchesList');
+
+      const normTitle = normalizeText(titleInput);
+      if (normTitle.length < 4) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      const inputTokens = extractTokens(`${titleInput} ${locInput}`);
+      if (inputTokens.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      const matches = tasks.filter(existing => {
+        if (editId && existing.id === editId) return false;
+        const exNormTitle = normalizeText(existing.title);
+        if (exNormTitle.includes(normTitle) || normTitle.includes(exNormTitle)) return true;
+
+        const exTokens = extractTokens(`${existing.title} ${existing.location || ''}`);
+        if (exTokens.length === 0) return false;
+
+        const common = inputTokens.filter(tok => exTokens.some(et => et === tok || (tok.length >= 4 && et.startsWith(tok.slice(0, 4)))));
+        const ratio = common.length / Math.min(inputTokens.length, exTokens.length);
+        return common.length >= 2 && ratio >= 0.6;
+      });
+
+      if (matches.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      listEl.innerHTML = matches.slice(0, 3).map(m => `
+        <li class="bg-white/80 px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center justify-between gap-2">
+          <div class="truncate">
+            <span class="font-semibold text-zinc-900">${escapeHtml(m.title)}</span>
+            ${m.location ? `<span class="text-zinc-600"> · ${escapeHtml(m.location)}</span>` : ''}
+          </div>
+          <span class="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+            ${statusLabel(m.status)} · ${priorityLabel(m.priority)}
+          </span>
+        </li>
+      `).join('');
+
+      box.classList.remove('hidden');
+    }
+
+    function setStatusFilter(status) {
+      statusFilter = status;
+      render();
+    }
+
+    function filterByHighPriority() {
+      statusFilter = 'Abiertas';
+      document.getElementById('priorityFilter').value = 'Alta';
+      render();
+    }
+
+    function filterByOverdue() {
+      statusFilter = 'Abiertas';
+      onlyOverdue = true;
+      onlyDelegated = false;
+      render();
+    }
+
+    function filterByDelegated() {
+      statusFilter = 'Abiertas';
+      onlyDelegated = true;
+      onlyOverdue = false;
+      render();
+    }
+
+    function toggleOnlyDelegated() {
+      onlyDelegated = !onlyDelegated;
+      render();
+    }
+
+    function toggleOnlyOverdue() {
+      onlyOverdue = !onlyOverdue;
+      render();
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      render();
+    }
+
+    function resetFilters() {
+      statusFilter = 'Abiertas';
+      onlyDelegated = false;
+      onlyOverdue = false;
+      document.getElementById('searchInput').value = '';
+      document.getElementById('priorityFilter').value = 'ALL';
+      document.getElementById('assigneeFilter').value = 'ALL';
+      render();
+    }
+
+    function handleSortModeChange() {
+      render();
+    }
+
+    function cyclePriority(id) {
+      const order = ['Alta', 'Media', 'Baja'];
+      const task = tasks.find(item => item.id === id);
+      if (!task) return;
+      const next = order[(order.indexOf(task.priority) + 1) % order.length];
+      task.priority = next;
+      saveTasks();
+      render();
+    }
+
+    function toggleTaskDone(id) {
+      const task = tasks.find(item => item.id === id);
+      if (!task) return;
+      task.status = task.status === 'Hecha' ? 'Pendiente' : 'Hecha';
+      saveTasks();
+      render();
+    }
+
+    function toggleDerivar(id, checked) {
+      const task = tasks.find(item => item.id === id);
+      if (!task) return;
+      task.derivar = checked;
+      saveTasks();
+      render();
+      if (checked) {
+        showToast(t('toastDelegated'));
+        setTimeout(() => {
+          const rowInput = document.querySelector(`tr[data-id="${id}"] input[list="companiesDatalist"]`);
+          if (rowInput) rowInput.focus();
+        }, 40);
+      }
+    }
+
+    function updateTaskField(id, field, value) {
+      const task = tasks.find(item => item.id === id);
+      if (!task) return;
+      task[field] = value;
+      saveTasks();
+      render();
+    }
+
+    function deleteTask(id) {
+      tasks = tasks.filter(item => item.id !== id);
+      saveTasks();
+      render();
+      showToast(t('toastDeleted'));
+    }
+
+    function moveTaskStep(id, direction) {
+      const ordered = [...tasks].sort((a, b) => a.order - b.order);
+      const idx = ordered.findIndex(item => item.id === id);
+      const targetIdx = idx + direction;
+      if (idx === -1 || targetIdx < 0 || targetIdx >= ordered.length) return;
+
+      const [moved] = ordered.splice(idx, 1);
+      ordered.splice(targetIdx, 0, moved);
+      ordered.forEach((item, i) => { item.order = i + 1; });
+
+      tasks = ordered;
+      saveTasks();
+      render();
+    }
+
+    function handleDragStart(e, id) {
+      draggedTaskId = id;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', id);
+      setTimeout(() => {
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (row) row.classList.add('dragging-row');
+      }, 0);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const row = e.currentTarget;
+      const rect = row.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+      if (e.clientY < midY) {
+        row.classList.add('drag-over-top');
+      } else {
+        row.classList.add('drag-over-bottom');
+      }
+    }
+
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+
+    function handleDrop(e, targetId) {
+      e.preventDefault();
+      const row = e.currentTarget;
+      const insertBefore = row.classList.contains('drag-over-top');
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+
+      if (!draggedTaskId || draggedTaskId === targetId) return;
+
+      const ordered = [...tasks].sort((a, b) => a.order - b.order);
+      const fromIndex = ordered.findIndex(item => item.id === draggedTaskId);
+      const targetIndex = ordered.findIndex(item => item.id === targetId);
+      if (fromIndex === -1 || targetIndex === -1) return;
+
+      const [movedTask] = ordered.splice(fromIndex, 1);
+
+      const sortMode = document.getElementById('sortModeSelect').value;
+      const targetTask = tasks.find(item => item.id === targetId);
+      if (sortMode === 'group_priority' && targetTask && movedTask.priority !== targetTask.priority) {
+        movedTask.priority = targetTask.priority;
+        showToast(t('toastPrioChanged', { prio: priorityLabel(targetTask.priority) }));
+      }
+
+      const newTargetIndex = ordered.findIndex(item => item.id === targetId);
+      const insertIndex = insertBefore ? newTargetIndex : newTargetIndex + 1;
+      ordered.splice(insertIndex, 0, movedTask);
+
+      ordered.forEach((item, idx) => {
+        item.order = idx + 1;
+      });
+
+      tasks = ordered;
+      saveTasks();
+      render();
+    }
+
+    function handleGroupDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleGroupDrop(e, targetPriority) {
+      e.preventDefault();
+      if (!draggedTaskId) return;
+      const task = tasks.find(item => item.id === draggedTaskId);
+      if (task && task.priority !== targetPriority) {
+        task.priority = targetPriority;
+        saveTasks();
+        render();
+        showToast(t('toastPrioChanged', { prio: priorityLabel(targetPriority) }));
+      }
+    }
+
+    function handleDragEnd() {
+      draggedTaskId = null;
+      document.querySelectorAll('tr').forEach(r => {
+        r.classList.remove('dragging-row', 'drag-over-top', 'drag-over-bottom');
+      });
+    }
+
+    function toggleModalDerivarInput() {
+      const checked = document.getElementById('fieldDerivar').checked;
+      const wrap = document.getElementById('modalDerivarCompanyWrap');
+      wrap.classList.toggle('hidden', !checked);
+      if (checked) {
+        setTimeout(() => document.getElementById('fieldDerivarTo').focus(), 40);
+      }
+    }
+
+    function openTaskModal(id = null) {
+      const modal = document.getElementById('taskModal');
+      const saveAndNewBtn = document.getElementById('saveAndNewBtn');
+      document.getElementById('taskForm').reset();
+      document.getElementById('duplicateWarningBox').classList.add('hidden');
+
+      if (id) {
+        const item = tasks.find(entry => entry.id === id);
+        if (!item) return;
+        document.getElementById('taskModalTitle').textContent = t('modalEditTitle');
+        document.getElementById('editTaskId').value = item.id;
+        document.getElementById('fieldTitle').value = item.title;
+        document.getElementById('fieldLocation').value = item.location || '';
+        document.getElementById('fieldNote').value = item.note || '';
+        document.getElementById('fieldPriority').value = item.priority;
+        document.getElementById('fieldStatus').value = item.status;
+        document.getElementById('fieldAssignee').value = item.assignee || 'Matías';
+        document.getElementById('fieldDeadline').value = item.deadline || '';
+        document.getElementById('fieldDerivar').checked = !!item.derivar;
+        document.getElementById('fieldDerivarTo').value = item.derivarTo || '';
+        document.getElementById('modalDerivarCompanyWrap').classList.toggle('hidden', !item.derivar);
+        saveAndNewBtn.classList.add('hidden');
+      } else {
+        document.getElementById('taskModalTitle').textContent = t('modalNewTitle');
+        document.getElementById('editTaskId').value = '';
+        document.getElementById('fieldPriority').value = 'Media';
+        document.getElementById('fieldStatus').value = 'Pendiente';
+        document.getElementById('fieldAssignee').value = 'Matías';
+        document.getElementById('fieldDerivar').checked = false;
+        document.getElementById('fieldDerivarTo').value = '';
+        document.getElementById('modalDerivarCompanyWrap').classList.add('hidden');
+        saveAndNewBtn.classList.remove('hidden');
+      }
+
+      modal.classList.remove('hidden');
+      setTimeout(() => document.getElementById('fieldTitle').focus(), 50);
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.add('hidden');
+    }
+
+    function persistModalForm() {
+      const titleInput = document.getElementById('fieldTitle');
+      if (!titleInput.value.trim()) {
+        titleInput.reportValidity();
+        return false;
+      }
+
+      const id = document.getElementById('editTaskId').value;
+      const isDerivar = document.getElementById('fieldDerivar').checked;
+      const data = {
+        title: titleInput.value.trim(),
+        location: document.getElementById('fieldLocation').value.trim(),
+        note: document.getElementById('fieldNote').value.trim(),
+        priority: document.getElementById('fieldPriority').value,
+        status: document.getElementById('fieldStatus').value,
+        assignee: document.getElementById('fieldAssignee').value.trim() || 'Matías',
+        deadline: document.getElementById('fieldDeadline').value,
+        derivar: isDerivar,
+        derivarTo: isDerivar ? document.getElementById('fieldDerivarTo').value.trim() : ''
+      };
+
+      if (id) {
+        const idx = tasks.findIndex(item => item.id === id);
+        if (idx !== -1) {
+          tasks[idx] = { ...tasks[idx], ...data };
+        }
+        showToast(t('toastUpdated'));
+      } else {
+        const minOrder = tasks.length ? Math.min(...tasks.map(item => item.order)) : 1;
+        tasks.unshift({
+          id: 't-' + Date.now(),
+          ...data,
+          order: minOrder - 1
+        });
+        showToast(t('toastCreated'));
+      }
+
+      saveTasks();
+      render();
+      return true;
+    }
+
+    function saveTaskFromModal(e) {
+      e.preventDefault();
+      if (persistModalForm()) {
+        closeTaskModal();
+      }
+    }
+
+    function saveTaskAndKeepOpen() {
+      if (persistModalForm()) {
+        const lastPriority = document.getElementById('fieldPriority').value;
+        const lastAssignee = document.getElementById('fieldAssignee').value;
+        document.getElementById('taskForm').reset();
+        document.getElementById('editTaskId').value = '';
+        document.getElementById('duplicateWarningBox').classList.add('hidden');
+        document.getElementById('fieldPriority').value = lastPriority;
+        document.getElementById('fieldStatus').value = 'Pendiente';
+        document.getElementById('fieldAssignee').value = lastAssignee || 'Matías';
+        document.getElementById('modalDerivarCompanyWrap').classList.add('hidden');
+        document.getElementById('fieldTitle').focus();
+      }
+    }
+
+    // =========================================================================
+    // SMART PARSER FOR BOTH SCHOOL GOOGLE SHEET FORMAT & STANDARD EXCEL FORMAT
+    // =========================================================================
+    function buildGoogleSheetCsvUrl(rawUrl) {
+      const match = rawUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (!match) return null;
+      const sheetId = match[1];
+      const gidMatch = rawUrl.match(/[#&?]gid=([0-9]+)/);
+      const gid = gidMatch ? gidMatch[1] : '0';
+      return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+    }
+
+    function updateGoogleSheetUI() {
+      const syncBtn = document.getElementById('syncNowBtn');
+      const statusRow = document.getElementById('gsStatusRow');
+      const urlInput = document.getElementById('googleSheetUrlInput');
+
+      if (googleSheetUrl) {
+        syncBtn.classList.remove('hidden');
+        statusRow.classList.remove('hidden');
+        urlInput.value = googleSheetUrl;
+      } else {
+        syncBtn.classList.add('hidden');
+        statusRow.classList.add('hidden');
+        urlInput.value = '';
+      }
+    }
+
+    function saveGoogleSheetConnection() {
+      const val = document.getElementById('googleSheetUrlInput').value.trim();
+      const csvUrl = buildGoogleSheetCsvUrl(val);
+      if (!csvUrl) {
+        showToast(t('gsInvalidUrl'));
+        return;
+      }
+      const isFirstTimeConnecting = !googleSheetUrl || googleSheetUrl !== val;
+      googleSheetUrl = val;
+      localStorage.setItem(GSHEET_KEY, googleSheetUrl);
+      updateGoogleSheetUI();
+      syncFromGoogleSheet(true, isFirstTimeConnecting);
+      startAutoSyncLoop();
+    }
+
+    function disconnectGoogleSheet() {
+      googleSheetUrl = '';
+      localStorage.removeItem(GSHEET_KEY);
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      updateGoogleSheetUI();
+    }
+
+    function startAutoSyncLoop() {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
+      autoSyncTimer = setInterval(() => {
+        if (googleSheetUrl && !document.hidden) {
+          syncFromGoogleSheet(false, false);
+        }
+      }, 30000);
+    }
+
+    function parseMatrixRows(matrix) {
+      if (!Array.isArray(matrix) || matrix.length === 0) return [];
+
+      let headerRowIndex = -1;
+      for (let r = 0; r < Math.min(matrix.length, 15); r++) {
+        const rowCells = (matrix[r] || []).map(c => normalizeText(c));
+        if (rowCells.some(c => ['tarea', 'tarefa', 'titulo', 'avaria', 'averia', 'descripcion'].includes(c))) {
+          headerRowIndex = r;
+          break;
+        }
+      }
+
+      if (headerRowIndex === -1) return [];
+
+      const rawHeaders = matrix[headerRowIndex] || [];
+      const colMap = {
+        done: -1,
+        requestDate: -1,
+        location: -1,
+        priority: -1,
+        title: -1,
+        notes: -1,
+        status: -1,
+        assignee: -1,
+        deadline: -1,
+        derivar: -1,
+        derivarTo: -1
+      };
+
+      rawHeaders.forEach((cell, idx) => {
+        const raw = String(cell || '').trim();
+        const norm = normalizeText(raw);
+
+        if (raw.includes('✓') || raw.includes('✔') || ['hecha', 'feita', 'completada', 'ok', 'check'].includes(norm)) {
+          colMap.done = idx;
+        } else if (norm.includes('solicitude') || norm.includes('solicitud') || norm === 'data' || norm === 'fecha') {
+          colMap.requestDate = idx;
+        } else if (norm.includes('ubicacion') || norm.includes('localizacion') || norm.includes('planta') || norm.includes('aula') || norm === 'lugar') {
+          colMap.location = idx;
+        } else if (norm.includes('prioridad')) {
+          colMap.priority = idx;
+        } else if (['tarea', 'tarefa', 'titulo', 'trabajo', 'traballo', 'avaria', 'averia', 'descripcion'].includes(norm)) {
+          colMap.title = idx;
+        } else if (norm.includes('observacion') || norm === 'nota' || norm === 'notas') {
+          colMap.notes = idx;
+        } else if (norm === 'estado') {
+          colMap.status = idx;
+        } else if (norm.includes('responsable') || norm.includes('asignado')) {
+          colMap.assignee = idx;
+        } else if (norm.includes('limite')) {
+          colMap.deadline = idx;
+        } else if (norm === 'derivar') {
+          colMap.derivar = idx;
+        } else if (norm.includes('derivado') || norm === 'empresa') {
+          colMap.derivarTo = idx;
+        }
+      });
+
+      if (colMap.done === -1 && colMap.title > 0) {
+        const firstColSamples = matrix.slice(headerRowIndex + 1, headerRowIndex + 10).map(r => String((r || [])[0] || '').trim().toUpperCase());
+        if (firstColSamples.some(v => ['TRUE', 'FALSE', 'VERDADEIRO', 'FALSO', '✓', '✔', '1', '0'].includes(v))) {
+          colMap.done = 0;
+        }
+      }
+
+      if (colMap.title === -1) return [];
+
+      const parsed = [];
+      for (let r = headerRowIndex + 1; r < matrix.length; r++) {
+        const row = matrix[r] || [];
+        const title = String(row[colMap.title] || '').trim();
+        if (!title) continue;
+
+        let status = 'Pendiente';
+        if (colMap.done !== -1) {
+          const doneVal = String(row[colMap.done] || '').trim().toUpperCase();
+          if (['TRUE', 'VERDADEIRO', 'VERDADERO', 'SI', 'SÍ', '1', 'X', '✓', '✔'].includes(doneVal)) {
+            status = 'Hecha';
+          }
+        }
+        if (colMap.status !== -1) {
+          const stVal = normalizeText(row[colMap.status]);
+          if (stVal.includes('curso')) status = 'En curso';
+          else if (stVal.includes('bloq')) status = 'Bloqueada';
+          else if (stVal.includes('hech') || stVal.includes('feit') || stVal.includes('comp')) status = 'Hecha';
+        }
+
+        let priority = 'Media';
+        if (colMap.priority !== -1) {
+          const prVal = normalizeText(row[colMap.priority]);
+          if (prVal.includes('alt')) priority = 'Alta';
+          else if (prVal.includes('baj') || prVal.includes('baix')) priority = 'Baja';
+          else if (prVal.includes('med')) priority = 'Media';
+        }
+
+        const location = colMap.location !== -1 ? String(row[colMap.location] || '').trim() : '';
+        const reqDate = colMap.requestDate !== -1 ? String(row[colMap.requestDate] || '').trim() : '';
+        const obs = colMap.notes !== -1 ? String(row[colMap.notes] || '').trim() : '';
+
+        const noteParts = [];
+        if (reqDate) noteParts.push(`Pedida ${reqDate}`);
+        if (obs) noteParts.push(obs);
+        const note = noteParts.join(' · ');
+
+        const assignee = colMap.assignee !== -1
+          ? (String(row[colMap.assignee] || '').trim() || 'Matías')
+          : 'Matías';
+
+        let deadline = colMap.deadline !== -1 ? String(row[colMap.deadline] || '').trim() : '';
+        if (/^\d{5}$/.test(deadline)) {
+          const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+          const dt = new Date(excelEpoch.getTime() + Number(deadline) * 86400000);
+          deadline = dt.toISOString().split('T')[0];
+        }
+
+        const derivarTo = colMap.derivarTo !== -1 ? String(row[colMap.derivarTo] || '').trim() : '';
+        let derivar = derivarTo.length > 0;
+        if (colMap.derivar !== -1) {
+          const derVal = normalizeText(row[colMap.derivar]);
+          if (['si', 'true', '1', 'x'].includes(derVal)) derivar = true;
+        }
+
+        parsed.push({
+          id: 'gs-' + r + '-' + Date.now(),
+          title,
+          location,
+          note,
+          priority,
+          status,
+          assignee,
+          deadline,
+          derivar,
+          derivarTo,
+          order: parsed.length + 1
+        });
+      }
+
+      return parsed;
+    }
+
+    async function syncFromGoogleSheet(manualFeedback = false, replaceAll = false) {
+      if (!googleSheetUrl) return;
+      const csvUrl = buildGoogleSheetCsvUrl(googleSheetUrl);
+      if (!csvUrl) return;
+
+      const btnLabel = document.getElementById('syncBtnLabel');
+      const dot = document.getElementById('syncDot');
+      btnLabel.textContent = t('syncingBtn');
+      dot.classList.add('animate-ping');
+
+      try {
+        const res = await fetch(`${csvUrl}&_ts=${Date.now()}`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const csvText = await res.text();
+        if (csvText.trim().startsWith('<!DOCTYPE') || csvText.trim().startsWith('<html')) {
+          throw new Error('Sheet not public');
+        }
+
+        const workbook = XLSX.read(csvText, { type: 'string' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const matrix = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+        const parsedRows = parseMatrixRows(matrix);
+
+        if (parsedRows.length === 0) {
+          if (manualFeedback) showToast(t('toastNoTaskCol'));
+          return;
+        }
+
+        let addedCount = 0;
+        let updatedCount = 0;
+
+        if (replaceAll) {
+          tasks = parsedRows;
+          addedCount = parsedRows.length;
+        } else {
+          let maxOrder = tasks.length ? Math.max(...tasks.map(item => item.order)) : 0;
+
+          parsedRows.forEach(incoming => {
+            const sigIncoming = `${normalizeText(incoming.title)}|${normalizeText(incoming.location)}`;
+            const existingIdx = tasks.findIndex(existing => {
+              const sigExisting = `${normalizeText(existing.title)}|${normalizeText(existing.location)}`;
+              return sigExisting === sigIncoming;
+            });
+
+            if (existingIdx === -1) {
+              maxOrder += 1;
+              tasks.push({
+                ...incoming,
+                order: maxOrder
+              });
+              addedCount++;
+            } else {
+              const cur = tasks[existingIdx];
+              let changed = false;
+              if (cur.status !== incoming.status) {
+                cur.status = incoming.status;
+                changed = true;
+              }
+              if (incoming.note && cur.note !== incoming.note) {
+                cur.note = incoming.note;
+                changed = true;
+              }
+              if (changed) updatedCount++;
+            }
+          });
+        }
+
+        if (addedCount > 0 || updatedCount > 0 || replaceAll) {
+          saveTasks();
+          render();
+        }
+
+        const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('gsLastSyncText').textContent = t('gsConnectedAt', { time: nowTime });
+
+        if (manualFeedback) {
+          if (addedCount > 0 || updatedCount > 0) {
+            showToast(t('gsSyncOk', { added: addedCount, updated: updatedCount, total: parsedRows.length }));
+          } else {
+            showToast(t('gsSyncNoNew', { total: parsedRows.length }));
+          }
+        }
+      } catch (err) {
+        console.error('Google Sheet sync error:', err);
+        if (manualFeedback) {
+          showToast(t('gsSyncError'));
+        }
+      } finally {
+        btnLabel.textContent = t('syncBtn');
+        dot.classList.remove('animate-ping');
+      }
+    }
+
+    // Excel Import & Export
+    function openExcelModal() {
+      document.getElementById('excelFileInput').value = '';
+      updateGoogleSheetUI();
+      document.getElementById('excelModal').classList.remove('hidden');
+    }
+
+    function closeExcelModal() {
+      document.getElementById('excelModal').classList.add('hidden');
+    }
+
+    function exportToExcel(emptyTemplate = false) {
+      const ordered = [...tasks].sort((a, b) => a.order - b.order);
+      const rows = emptyTemplate
+        ? [{
+            'Tarefa': 'Exemplo: Revisar persiana aula 2º A',
+            'Ubicacion/Planta': '2º ESO A',
+            'OBSERVACIONES': 'Pedida hoxe',
+            'Prioridad': 'Alta',
+            'Estado': 'Pendente',
+            'Responsable': 'Matías',
+            'Data Limite': todayISO(),
+            'Derivar': 'Non',
+            'Derivado a': ''
+          }]
+        : ordered.map(item => ({
+            'Tarefa': item.title,
+            'Ubicacion/Planta': item.location || '',
+            'OBSERVACIONES': item.note || '',
+            'Prioridad': priorityLabel(item.priority),
+            'Estado': statusLabel(item.status),
+            'Responsable': item.assignee || 'Matías',
+            'Data Limite': item.deadline || '',
+            'Derivar': item.derivar ? (currentLang === 'gl' ? 'Si' : 'Sí') : (currentLang === 'gl' ? 'Non' : 'No'),
+            'Derivado a': item.derivarTo || ''
+          }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 46 }, { wch: 22 }, { wch: 28 }, { wch: 12 },
+        { wch: 14 }, { wch: 16 }, { wch: 15 }, { wch: 10 }, { wch: 22 }
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Traballos Andaina');
+      const filename = emptyTemplate ? 'modelo_traballos_andaina.xlsx' : `traballos_andaina_${todayISO()}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      showToast(t('toastExcelDown'));
+    }
+
+    function handleExcelImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const mode = document.querySelector('input[name="importMode"]:checked').value;
+      const reader = new FileReader();
+
+      reader.onload = function(evt) {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const matrix = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+
+          if (!matrix.length) {
+            showToast(t('toastEmptyFile'));
+            return;
+          }
+
+          const imported = parseMatrixRows(matrix);
+
+          if (!imported.length) {
+            showToast(t('toastNoTaskCol'));
+            return;
+          }
+
+          if (mode === 'replace') {
+            tasks = imported;
+          } else {
+            const maxOrder = tasks.length ? Math.max(...tasks.map(item => item.order)) : 0;
+            imported.forEach((item, i) => { item.order = maxOrder + i + 1; });
+            tasks = [...tasks, ...imported];
+          }
+
+          saveTasks();
+          render();
+          closeExcelModal();
+          showToast(t('toastImported', { n: imported.length }));
+        } catch (err) {
+          console.error(err);
+          showToast(t('toastReadError'));
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    function restoreDemoData() {
+      tasks = structuredClone(DEFAULT_TASKS);
+      saveTasks();
+      resetFilters();
+      showToast(t('toastRestored'));
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    let toastTimer;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.add('hidden'), 3500);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const tag = document.activeElement?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if (!typing && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        openTaskModal();
+      } else if (e.key === 'Escape') {
+        closeTaskModal();
+        closeExcelModal();
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>
